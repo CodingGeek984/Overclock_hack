@@ -16,9 +16,9 @@ const FILTERS = [
 ]
 
 function scoreCls(score) {
-  if (score >= 80) return 'text-rose-400'
-  if (score >= 50) return 'text-amber-400'
-  return 'text-emerald-400'
+  if (score >= 80) return 'text-rose-600'
+  if (score >= 50) return 'text-amber-600'
+  return 'text-emerald-600'
 }
 
 export default function TxTable({ transactions }) {
@@ -57,7 +57,7 @@ export default function TxTable({ transactions }) {
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center gap-3">
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -66,20 +66,22 @@ export default function TxTable({ transactions }) {
                 setStatusFilter(f.id)
                 setPage(1)
               }}
-              className={`px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                 statusFilter === f.id
-                  ? 'border-zinc-600 bg-zinc-800 text-zinc-100'
-                  : 'border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+                  ? 'bg-zinc-950 border-zinc-950 text-white'
+                  : 'border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
               }`}
             >
               {f.label}
-              <span className="ml-1.5 text-zinc-500">{counts[f.id] ?? 0}</span>
+              <span className={`ml-1.5 ${statusFilter === f.id ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                {counts[f.id] ?? 0}
+              </span>
             </button>
           ))}
         </div>
 
         <div className="relative md:ml-auto">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             value={query}
             onChange={(e) => {
@@ -87,24 +89,24 @@ export default function TxTable({ transactions }) {
               setPage(1)
             }}
             placeholder="IP / merchant / amount / id"
-            className="w-full md:w-60 pl-9 pr-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500/20"
+            className="w-full md:w-64 pl-10 pr-4 py-2.5 rounded-full bg-zinc-100 border border-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900/10 transition-all"
           />
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-md border border-zinc-800">
+      <div className="mt-5 overflow-hidden rounded-3xl border border-zinc-200">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm min-w-[860px]">
             <thead>
-              <tr className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 bg-zinc-950/50">
-                <th className="px-3 py-2.5 font-medium">TXN ID</th>
-                <th className="px-3 py-2.5 font-medium">Дата / время</th>
-                <th className="px-3 py-2.5 font-medium">Сумма</th>
-                <th className="px-3 py-2.5 font-medium">Карта</th>
-                <th className="px-3 py-2.5 font-medium">IP</th>
-                <th className="px-3 py-2.5 font-medium">Мерчант</th>
-                <th className="px-3 py-2.5 font-medium">Score</th>
-                <th className="px-3 py-2.5 font-medium">Решение</th>
+              <tr className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-50">
+                <th className="px-4 py-3 font-bold">TXN ID</th>
+                <th className="px-4 py-3 font-bold">Дата / время</th>
+                <th className="px-4 py-3 font-bold">Сумма</th>
+                <th className="px-4 py-3 font-bold">Карта</th>
+                <th className="px-4 py-3 font-bold">IP</th>
+                <th className="px-4 py-3 font-bold">Мерчант</th>
+                <th className="px-4 py-3 font-bold">Score</th>
+                <th className="px-4 py-3 font-bold">Решение</th>
               </tr>
             </thead>
             <tbody>
@@ -112,21 +114,21 @@ export default function TxTable({ transactions }) {
                 <tr
                   key={tx.id}
                   onClick={() => setSelected(tx)}
-                  className="border-t border-zinc-800/70 hover:bg-zinc-900/40 cursor-pointer transition-colors"
+                  className="border-t border-zinc-100 hover:bg-zinc-50 cursor-pointer transition-colors"
                 >
-                  <td className="px-3 py-2.5 font-mono text-xs text-zinc-400">{tx.id}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-zinc-500">{formatDateTime(tx.date)}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-zinc-200">{formatKZT(tx.amount)}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-zinc-500">{maskCard(tx.card)}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-zinc-500">
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{tx.id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{formatDateTime(tx.date)}</td>
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-900">{formatKZT(tx.amount)}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{maskCard(tx.card)}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">
                     {tx.ip}
-                    <span className="ml-1.5 text-zinc-600">{tx.country}</span>
+                    <span className="ml-1.5 text-zinc-400">{tx.country}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-zinc-300 text-xs">{tx.merchant}</td>
-                  <td className={`px-3 py-2.5 font-mono text-xs font-medium ${scoreCls(tx.score)}`}>
+                  <td className="px-4 py-3 text-zinc-700 text-xs font-medium">{tx.merchant}</td>
+                  <td className={`px-4 py-3 font-mono text-xs font-bold ${scoreCls(tx.score)}`}>
                     {tx.score}%
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-4 py-3">
                     <Badge status={tx.status} size="xs" />
                   </td>
                 </tr>
@@ -136,21 +138,21 @@ export default function TxTable({ transactions }) {
         </div>
 
         {rows.length === 0 && (
-          <div className="py-12 text-center text-sm text-zinc-600">
+          <div className="py-12 text-center text-sm text-zinc-400">
             Нет транзакций по заданным фильтрам
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-t border-zinc-800 bg-zinc-950/40">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-zinc-100 bg-zinc-50/60">
           <p className="text-xs font-mono text-zinc-500">
             {filtered.length} / {transactions.length} · стр. {safePage}/{totalPages}
           </p>
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             <button
               type="button"
               disabled={safePage <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="p-1.5 rounded-md border border-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-2 rounded-full border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Назад"
             >
               <ChevronLeft size={14} />
@@ -159,7 +161,7 @@ export default function TxTable({ transactions }) {
               type="button"
               disabled={safePage >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="p-1.5 rounded-md border border-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-2 rounded-full border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Вперёд"
             >
               <ChevronRight size={14} />
@@ -170,23 +172,23 @@ export default function TxTable({ transactions }) {
 
       <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.id} subtitle="SHAP-объяснение решения">
         {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
               {[
                 ['Сумма', formatKZT(selected.amount)],
                 ['Карта', maskCard(selected.card)],
                 ['IP', `${selected.ip} (${selected.country})`],
                 ['Мерчант', selected.merchant],
               ].map(([k, v]) => (
-                <div key={k} className="rounded-md bg-zinc-950 border border-zinc-800 p-2.5">
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{k}</div>
-                  <div className="mt-1 text-xs font-mono text-zinc-200 truncate">{v}</div>
+                <div key={k} className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">{k}</div>
+                  <div className="mt-1 text-xs font-mono font-medium text-zinc-800 truncate">{v}</div>
                 </div>
               ))}
             </div>
 
             <div>
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
                 SHAP-факторы
               </p>
               <ShapChart
@@ -198,9 +200,9 @@ export default function TxTable({ transactions }) {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Risk Score</span>
-              <span className={`font-mono text-lg font-medium ${scoreCls(selected.score)}`}>
+            <div className="flex items-center justify-between rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Risk Score</span>
+              <span className={`font-mono text-xl font-extrabold ${scoreCls(selected.score)}`}>
                 {selected.score}%
               </span>
             </div>

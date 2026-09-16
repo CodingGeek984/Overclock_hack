@@ -1,6 +1,6 @@
-export default function Spinner({ size = 18, label = 'Анализ...', className = '' }) {
+export default function Spinner({ size = 20, label = 'Анализ...', className = '', dark = false }) {
   return (
-    <span className={`inline-flex items-center gap-2 text-zinc-500 ${className}`}>
+    <span className={`inline-flex items-center gap-2.5 ${dark ? 'text-zinc-400' : 'text-zinc-500'} ${className}`}>
       <svg
         width={size}
         height={size}
@@ -10,10 +10,10 @@ export default function Spinner({ size = 18, label = 'Анализ...', classNam
         role="status"
         aria-label={label}
       >
-        <circle cx="12" cy="12" r="10" stroke="#3f3f46" strokeOpacity="0.4" strokeWidth="2" />
-        <path d="M22 12a10 10 0 0 0-10-10" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="12" cy="12" r="10" stroke={dark ? '#3f3f46' : '#e4e4e7'} strokeOpacity="1" strokeWidth="3" />
+        <path d="M22 12a10 10 0 0 0-10-10" stroke={dark ? '#fafafa' : '#18181b'} strokeWidth="3" strokeLinecap="round" />
       </svg>
-      {label && <span className="text-xs font-mono">{label}</span>}
+      {label && <span className="text-sm font-medium">{label}</span>}
     </span>
   )
 }

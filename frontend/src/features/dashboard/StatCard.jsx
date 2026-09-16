@@ -1,26 +1,40 @@
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 
-export default function StatCard({ label, value, unit = '', delta = '', trend = 'up', sub = '' }) {
+export default function StatCard({ label, value, unit = '', delta = '', trend = 'up', sub = '', tone = 'light' }) {
   const up = trend !== 'down'
+  const dark = tone === 'dark'
+
   return (
-    <section className="bg-zinc-900/50 border border-zinc-800 rounded-lg px-4 py-4">
-      <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{label}</div>
-      <div className="mt-1.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-        {value}
-        {unit && <span className="text-base text-zinc-500">{unit}</span>}
+    <section
+      className={`rounded-3xl p-6 ${
+        dark ? 'bg-zinc-950 text-white' : 'bg-white border border-zinc-200'
+      }`}
+    >
+      <div
+        className={`text-xs font-semibold uppercase tracking-wider ${
+          dark ? 'text-zinc-500' : 'text-zinc-500'
+        }`}
+      >
+        {label}
       </div>
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 text-[40px] font-extrabold tracking-tight leading-none">
+        {value}
+        {unit && <span className={`text-xl font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>{unit}</span>}
+      </div>
+      <div className="mt-3 flex items-center gap-2">
         {delta && (
           <span
-            className={`inline-flex items-center gap-0.5 text-[11px] font-mono ${
-              up ? 'text-emerald-400/80' : 'text-zinc-500'
+            className={`inline-flex items-center gap-0.5 text-xs font-semibold ${
+              up ? 'text-emerald-600' : 'text-zinc-400'
             }`}
           >
-            {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+            {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
             {delta}
           </span>
         )}
-        {sub && <span className="text-[11px] text-zinc-600 truncate">{sub}</span>}
+        {sub && (
+          <span className={`text-xs truncate ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>{sub}</span>
+        )}
       </div>
     </section>
   )
