@@ -20,7 +20,7 @@ function hash(seed) {
   return Math.abs(h) % 100
 }
 
-function buildAssessment(params, seed) {
+export function buildAssessment(params, seed = Math.floor(Math.random() * 100)) {
   const factors = []
   const addFactor = (name, effect, detail, strength = 'medium') => {
     factors.push({ name, effect: Number(effect.toFixed(3)), detail, strength })

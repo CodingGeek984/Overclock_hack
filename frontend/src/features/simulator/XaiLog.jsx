@@ -1,4 +1,5 @@
 import { formatTime } from '../../utils/formatters'
+import { useLanguage } from '../../context/LanguageContext'
 
 const LEVEL_BADGE = {
   info: 'bg-zinc-400/10 text-zinc-300',
@@ -8,14 +9,16 @@ const LEVEL_BADGE = {
 }
 
 export default function XaiLog({ steps = [], thinking = false }) {
+  const { t } = useLanguage()
+
   return (
     <div className="rounded-2xl bg-white/[0.05] p-4 font-mono text-xs leading-relaxed text-zinc-400 max-h-60 overflow-y-auto">
       <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10">
         <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-          LLM-assistant log
+          {t.xaiTitle}
         </span>
         <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">
-          {thinking ? 'thinking' : `trace:${steps.length}`}
+          {thinking ? t.xaiThinking : `${t.xaiTrace}:${steps.length}`}
         </span>
       </div>
 
@@ -43,7 +46,7 @@ export default function XaiLog({ steps = [], thinking = false }) {
       })}
 
       {!thinking && steps.length === 0 && (
-        <div className="text-zinc-600 text-center py-5">ожидание анализа</div>
+        <div className="text-zinc-600 text-center py-5">{t.xaiWaiting}</div>
       )}
     </div>
   )

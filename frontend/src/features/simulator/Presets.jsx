@@ -1,32 +1,45 @@
 import { PRESETS } from '../../services/mockData'
+import { useLanguage } from '../../context/LanguageContext'
+
+const PRESET_KEY = {
+  legit: 'presetLegit',
+  borderline: 'presetBorderline',
+  fraud: 'presetFraud',
+}
+
+const TONE_BY_ID = {
+  legit: 'emerald',
+  borderline: 'amber',
+  fraud: 'rose',
+}
 
 const TONE = {
   emerald: {
-    dot: 'bg-emerald-500',
-    ring: 'text-emerald-600',
     active: 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25',
     idle: 'bg-white border-zinc-200 text-zinc-700 hover:border-emerald-300 hover:bg-emerald-50/50',
   },
   amber: {
-    dot: 'bg-amber-500',
-    ring: 'text-amber-600',
     active: 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/25',
     idle: 'bg-white border-zinc-200 text-zinc-700 hover:border-amber-300 hover:bg-amber-50/50',
   },
   rose: {
-    dot: 'bg-rose-500',
-    ring: 'text-rose-600',
     active: 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-500/25',
     idle: 'bg-white border-zinc-200 text-zinc-700 hover:border-rose-300 hover:bg-rose-50/50',
   },
 }
 
-export default function Presets({ onSelect, activeId = null }) {
+export default function Presets({ onSelect, activeId = null, presets = PRESETS }) {
+  const { t } = useLanguage()
+
+  const rows = presets.length > 0 ? presets : PRESETS
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-      {PRESETS.map((p) => {
-        const tone = TONE[p.tone]
+      {rows.map((p) => {
+        const toneName = p.tone ?? TONE_BY_ID[p.id] ?? 'emerald'
+        const tone = TONE[toneName] ?? TONE.emerald
         const active = activeId === p.id
+        const label = t[PRESET_KEY[p.id] ?? 'presetLegit']
         return (
           <button
             key={p.id}
@@ -36,8 +49,7 @@ export default function Presets({ onSelect, activeId = null }) {
               active ? tone.active : tone.idle
             }`}
           >
-            <span className={`w-2 h-2 rounded-full ${tone.dot}`} />
-            {p.label}
+            {label}
           </button>
         )
       })}

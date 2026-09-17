@@ -1,14 +1,18 @@
 import { UserRound } from 'lucide-react'
+import { useLanguage } from '../../context/LanguageContext'
+import LanguageSelector from '../ui/LanguageSelector'
 
 const TABS = [
-  { id: 'dashboard', label: 'Дашборд' },
-  { id: 'simulator', label: 'Live-Симулятор' },
-  { id: 'batch', label: 'Batch 100k' },
+  { id: 'dashboard', key: 'dashboard', short: 'Дашборд' },
+  { id: 'simulator', key: 'simulator', short: 'Live' },
+  { id: 'batch', key: null, short: 'Batch' },
+  { id: 'geo', key: 'geo', short: 'Geo' },
+  { id: 'xai', key: 'xai', short: 'XAI' },
 ]
 
-const LANGS = ['RU', 'KZ', 'EN']
+export default function Header({ activeTab, onTabChange }) {
+  const { t } = useLanguage()
 
-export default function Header({ activeTab, onTabChange, lang, onLangChange }) {
   return (
     <header className="sticky top-0 z-40 h-16 border-b border-zinc-100 bg-white/85 backdrop-blur-xl">
       <div className="flex items-center justify-between gap-4 h-full px-4 sm:px-6 lg:px-8 max-w-[1200px] mx-auto">
@@ -22,7 +26,7 @@ export default function Header({ activeTab, onTabChange, lang, onLangChange }) {
             </svg>
           </span>
           <span className="text-[19px] font-extrabold tracking-tight text-zinc-950 leading-none">
-            FraudHunter
+            {t.appTitle}
           </span>
         </a>
 
@@ -38,7 +42,7 @@ export default function Header({ activeTab, onTabChange, lang, onLangChange }) {
                   : 'text-zinc-500 hover:text-zinc-900'
               }`}
             >
-              {tab.label}
+              {tab.key ? t[tab.key] : 'Batch 100k'}
             </button>
           ))}
         </nav>
@@ -49,32 +53,21 @@ export default function Header({ activeTab, onTabChange, lang, onLangChange }) {
               key={tab.id}
               type="button"
               onClick={() => onTabChange?.(tab.id)}
-              aria-label={tab.label}
+              aria-label={tab.key ? t[tab.key] : 'Batch 100k'}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === tab.id
                   ? 'bg-white text-zinc-950 shadow-sm'
                   : 'text-zinc-500'
               }`}
             >
-              {tab.label.split(' ')[0]}
+              {tab.short}
             </button>
           ))}
         </nav>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden sm:flex items-center gap-0.5 rounded-full bg-zinc-100 p-1">
-            {LANGS.map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => onLangChange?.(l)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  lang === l ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'
-                }`}
-              >
-                {l}
-              </button>
-            ))}
+          <div className="hidden sm:block">
+            <LanguageSelector />
           </div>
 
           <button

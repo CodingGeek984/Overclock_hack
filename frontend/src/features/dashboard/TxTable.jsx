@@ -3,17 +3,11 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import ShapChart from '../../components/charts/ShapChart'
+import { useLanguage } from '../../context/LanguageContext'
 import { STATUS } from '../../utils/riskColors'
 import { maskCard, formatDateTime, formatKZT } from '../../utils/formatters'
 
 const PAGE_SIZE = 10
-
-const FILTERS = [
-  { id: 'ALL', label: 'Все', countKey: null },
-  { id: STATUS.APPROVE, label: 'Approve' },
-  { id: STATUS.CHALLENGE, label: 'Challenge' },
-  { id: STATUS.BLOCK, label: 'Block' },
-]
 
 function scoreCls(score) {
   if (score >= 80) return 'text-rose-600'
@@ -22,10 +16,18 @@ function scoreCls(score) {
 }
 
 export default function TxTable({ transactions }) {
+  const { t } = useLanguage()
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState(null)
+
+  const FILTERS = [
+    { id: 'ALL', label: t.txAll, countKey: null },
+    { id: STATUS.APPROVE, label: 'Approve' },
+    { id: STATUS.CHALLENGE, label: 'Challenge' },
+    { id: STATUS.BLOCK, label: 'Block' },
+  ]
 
   const counts = useMemo(() => {
     const acc = { ALL: transactions.length, [STATUS.APPROVE]: 0, [STATUS.CHALLENGE]: 0, [STATUS.BLOCK]: 0 }
@@ -88,7 +90,7 @@ export default function TxTable({ transactions }) {
               setQuery(e.target.value)
               setPage(1)
             }}
-            placeholder="IP / merchant / amount / id"
+            placeholder={t.txSearchPlaceholder}
             className="w-full md:w-64 pl-10 pr-4 py-2.5 rounded-full bg-zinc-100 border border-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900/10 transition-all"
           />
         </div>
@@ -100,13 +102,13 @@ export default function TxTable({ transactions }) {
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-50">
                 <th className="px-4 py-3 font-bold">TXN ID</th>
-                <th className="px-4 py-3 font-bold">Дата / время</th>
-                <th className="px-4 py-3 font-bold">Сумма</th>
-                <th className="px-4 py-3 font-bold">Карта</th>
+                <th className="px-4 py-3 font-bold">{t.thDate}</th>
+                <th className="px-4 py-3 font-bold">{t.thAmount}</th>
+                <th className="px-4 py-3 font-bold">{t.thCard}</th>
                 <th className="px-4 py-3 font-bold">IP</th>
-                <th className="px-4 py-3 font-bold">Мерчант</th>
+                <th className="px-4 py-3 font-bold">{t.thMerchant}</th>
                 <th className="px-4 py-3 font-bold">Score</th>
-                <th className="px-4 py-3 font-bold">Решение</th>
+                <th className="px-4 py-3 font-bold">{t.thDecision}</th>
               </tr>
             </thead>
             <tbody>
@@ -139,13 +141,13 @@ export default function TxTable({ transactions }) {
 
         {rows.length === 0 && (
           <div className="py-12 text-center text-sm text-zinc-400">
-            Нет транзакций по заданным фильтрам
+            {t.noTx}
           </div>
         )}
 
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-zinc-100 bg-zinc-50/60">
           <p className="text-xs font-mono text-zinc-500">
-            {filtered.length} / {transactions.length} · стр. {safePage}/{totalPages}
+            {filtered.length} / {transactions.length} · {t.pageOf} {safePage}/{totalPages}
           </p>
           <div className="flex gap-1.5">
             <button
@@ -153,7 +155,7 @@ export default function TxTable({ transactions }) {
               disabled={safePage <= 1}
               onClick={() => setPage((p) => p - 1)}
               className="p-2 rounded-full border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              aria-label="Назад"
+              aria-label={t.prev}
             >
               <ChevronLeft size={14} />
             </button>
@@ -162,7 +164,7 @@ export default function TxTable({ transactions }) {
               disabled={safePage >= totalPages}
               onClick={() => setPage((p) => p + 1)}
               className="p-2 rounded-full border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              aria-label="Вперёд"
+              aria-label={t.next}
             >
               <ChevronRight size={14} />
             </button>
@@ -170,15 +172,15 @@ export default function TxTable({ transactions }) {
         </div>
       </div>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.id} subtitle="SHAP-объяснение решения">
+      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.id} subtitle={t.shapModalSub}>
         {selected && (
           <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
               {[
-                ['Сумма', formatKZT(selected.amount)],
-                ['Карта', maskCard(selected.card)],
+                [t.txAmount, formatKZT(selected.amount)],
+                [t.thCard, maskCard(selected.card)],
                 ['IP', `${selected.ip} (${selected.country})`],
-                ['Мерчант', selected.merchant],
+                [t.thMerchant, selected.merchant],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">{k}</div>
@@ -189,13 +191,13 @@ export default function TxTable({ transactions }) {
 
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
-                SHAP-факторы
+                {t.shapFactors}
               </p>
               <ShapChart
                 data={[
-                  { name: 'Сумма', effect: selected.score / 220 + 0.08, detail: 'Аномальное отклонение' },
-                  { name: 'Репутация IP', effect: selected.score / 240, detail: 'Proxy-диапазон' },
-                  { name: 'Гео-скорость', effect: 0.15 - selected.score / 700, detail: 'Смена локаций' },
+                  { name: t.txAmount, effect: selected.score / 220 + 0.08, detail: t.shapAmountDetail },
+                  { name: t.shapIp, effect: selected.score / 240, detail: t.shapIpDetail },
+                  { name: t.shapGeo, effect: 0.15 - selected.score / 700, detail: t.shapGeoDetail },
                 ]}
               />
             </div>

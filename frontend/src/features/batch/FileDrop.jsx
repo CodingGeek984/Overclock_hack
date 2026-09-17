@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import { FileUp } from 'lucide-react'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function FileDrop({ onFile, onDemo, accept = '.csv' }) {
+  const { t } = useLanguage()
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
@@ -51,9 +53,9 @@ export default function FileDrop({ onFile, onDemo, accept = '.csv' }) {
           <FileUp size={26} strokeWidth={1.8} />
         </span>
         <p className="text-lg font-bold tracking-tight text-zinc-950">
-          {dragOver ? 'Отпустите файл' : 'Перетащите CSV-файл сюда'}
+          {dragOver ? t.dropActive : t.dropIdle}
         </p>
-        <p className="text-sm text-zinc-500 font-mono">mock-100k-sample.csv · клик для выбора</p>
+        <p className="text-sm text-zinc-500 font-mono">{t.dropHint}</p>
         <button
           type="button"
           onClick={(e) => {
@@ -62,7 +64,7 @@ export default function FileDrop({ onFile, onDemo, accept = '.csv' }) {
           }}
           className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-zinc-950 text-white px-5 py-2.5 text-sm font-semibold hover:bg-zinc-800 transition-colors"
         >
-          демо-файл 10k без загрузки
+          {t.demoBtn}
         </button>
       </div>
     </div>

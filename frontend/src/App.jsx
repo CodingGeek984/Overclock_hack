@@ -1,15 +1,31 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useCallback, useState } from 'react'
 import Layout from './components/layout/Layout'
 import Spinner from './components/ui/Spinner'
+import { LanguageProvider } from './context/LanguageContext'
 
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const Simulator = lazy(() => import('./features/simulator/Simulator'))
 const BatchView = lazy(() => import('./features/batch/BatchView'))
+const GeoMap = lazy(() => import('./features/geo/GeoMap'))
+const XaiCenter = lazy(() => import('./features/xai/XaiCenter'))
 
 const VIEWS = {
   dashboard: Dashboard,
   simulator: Simulator,
   batch: BatchView,
+  geo: GeoMap,
+  xai: XaiCenter,
+}
+
+const TAB_STORAGE_KEY = 'app_tab'
+
+function readInitialTab() {
+  try {
+    const saved = localStorage.getItem(TAB_STORAGE_KEY)
+    return saved && VIEWS[saved] ? saved : 'dashboard'
+  } catch {
+    return 'dashboard'
+  }
 }
 
 function Fallback() {
@@ -21,22 +37,28 @@ function Fallback() {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [lang, setLang] = useState('RU')
+  const [activeTab, setActiveTab] = useState(readInitialTab)
+
+  const handleTabChange = useCallback((tab) => {
+    if (!VIEWS[tab]) return
+    setActiveTab(tab)
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, tab)
+    } catch {
+      /* storage unavailable */
+    }
+  }, [])
 
   const ActiveView = VIEWS[activeTab] ?? Dashboard
 
   return (
-    <Layout
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      lang={lang}
-      onLangChange={setLang}
-    >
-      <Suspense fallback={<Fallback />}>
-        <ActiveView />
-      </Suspense>
-    </Layout>
+    <LanguageProvider>
+      <Layout activeTab={activeTab} onTabChange={handleTabChange}>
+        <Suspense fallback={<Fallback />}>
+          <ActiveView />
+        </Suspense>
+      </Layout>
+    </LanguageProvider>
   )
 }
 
