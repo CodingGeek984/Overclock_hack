@@ -5,11 +5,13 @@ import Spinner from './components/ui/Spinner'
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const Simulator = lazy(() => import('./features/simulator/Simulator'))
 const BatchView = lazy(() => import('./features/batch/BatchView'))
+const CasesView = lazy(() => import('./features/cases/CasesView'))
 
 const VIEWS = {
   dashboard: Dashboard,
   simulator: Simulator,
   batch: BatchView,
+  cases: CasesView,
 }
 
 function Fallback() {

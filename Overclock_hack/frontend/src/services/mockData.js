@@ -188,3 +188,178 @@ export const LOSS_CURVE = [
   { threshold: 90, fraudLoss: 310000, friction: 5.8, fpr: 0.31 },
   { threshold: 100, fraudLoss: 180000, friction: 7.4, fpr: 0.12 },
 ]
+
+// Score distribution for histogram widget (bins 0-10, 10-20, ..., 90-100)
+export const SCORE_DISTRIBUTION = [
+  { bin: '0–10',  safe: 1840, fraud: 2 },
+  { bin: '10–20', safe: 1120, fraud: 5 },
+  { bin: '20–30', safe: 620,  fraud: 11 },
+  { bin: '30–40', safe: 310,  fraud: 19 },
+  { bin: '40–50', safe: 148,  fraud: 34 },
+  { bin: '50–60', safe: 74,   fraud: 62 },
+  { bin: '60–70', safe: 38,   fraud: 118 },
+  { bin: '70–80', safe: 21,   fraud: 204 },
+  { bin: '80–90', safe: 9,    fraud: 381 },
+  { bin: '90–100',safe: 3,    fraud: 612 },
+]
+
+// Model health / monitoring data
+export const MODEL_METRICS = {
+  version: 'xgb-v3.2k',
+  auc: 0.943,
+  aucPrev: 0.951,
+  precision: 94.2,
+  recall: 91.8,
+  trainedAt: '2026-09-01',
+  latencyP95: 18,
+  latencyP99: 31,
+  status: 'warning', // 'healthy' | 'warning' | 'critical'
+  aucTimeline: [
+    { day: 'Сен 11', auc: 0.951 },
+    { day: 'Сен 12', auc: 0.949 },
+    { day: 'Сен 13', auc: 0.947 },
+    { day: 'Сен 14', auc: 0.944 },
+    { day: 'Сен 15', auc: 0.942 },
+    { day: 'Сен 16', auc: 0.940 },
+    { day: 'Сен 17', auc: 0.943 },
+  ],
+}
+
+// Feature drift data for heatmap
+export const DRIFT_DATA = [
+  { feature: 'amount_z_score',    psi: 0.04, status: 'stable',   baseline: 0.48, current: 0.49 },
+  { feature: 'geo_velocity',      psi: 0.19, status: 'warning',  baseline: 0.12, current: 0.21 },
+  { feature: 'velocity_1h',       psi: 0.07, status: 'stable',   baseline: 0.31, current: 0.33 },
+  { feature: 'new_device_flag',   psi: 0.03, status: 'stable',   baseline: 0.18, current: 0.18 },
+  { feature: 'country_risk',      psi: 0.23, status: 'critical', baseline: 0.09, current: 0.19 },
+  { feature: 'merchant_category', psi: 0.05, status: 'stable',   baseline: 0.44, current: 0.46 },
+]
+
+// Case management mock data
+export const CASES = [
+  {
+    id: 'CASE-4821', txId: 'TXN-98241', createdAt: '2026-09-17T09:42:08', updatedAt: '2026-09-17T10:15:00',
+    status: 'OPEN', priority: 'CRITICAL', assignee: null,
+    amount: 1850000, country: 'NG', merchant: 'Crypto Exchange', score: 96,
+    card: '4400 1234 8790 1122', ip: '185.220.101.4', device: 'Android Emulator',
+    notes: '',
+    shapFactors: [
+      { name: 'Гео-скорость', effect: 0.42, detail: '1 840 км/ч — физически невозможно' },
+      { name: 'Новое устройство', effect: 0.31, detail: 'Эмулятор Android, первый раз' },
+      { name: 'Страна получателя', effect: 0.28, detail: 'Нигерия — высокий страновой риск' },
+      { name: 'Мерчант категория', effect: 0.22, detail: 'Crypto Exchange — зона высокого риска' },
+      { name: 'Сумма транзакции', effect: 0.19, detail: '3.8x выше среднего чека пользователя' },
+      { name: 'Время суток', effect: -0.04, detail: 'Дневное время — типично для пользователя' },
+    ],
+    history: [
+      { id: 'TXN-98200', date: '2026-09-15T14:22:00', amount: 48000,  merchant: 'Kaspi.kz', score: 9,  status: 'APPROVE' },
+      { id: 'TXN-98180', date: '2026-09-14T11:05:00', amount: 125000, merchant: 'Alser',    score: 18, status: 'APPROVE' },
+      { id: 'TXN-98150', date: '2026-09-12T18:30:00', amount: 22000,  merchant: 'Sulpak',   score: 12, status: 'APPROVE' },
+    ],
+  },
+  {
+    id: 'CASE-4820', txId: 'TXN-98236', createdAt: '2026-09-17T09:37:03', updatedAt: '2026-09-17T09:50:00',
+    status: 'IN_REVIEW', priority: 'HIGH', assignee: 'Айгуль М.',
+    amount: 610000, country: 'PH', merchant: 'Skrill Wallet', score: 91,
+    card: '4701 3388 2200 9911', ip: '143.198.44.12', device: 'Android Emulator',
+    notes: 'Пользователь ранее замечен в частых переводах через кошельки',
+    shapFactors: [
+      { name: 'Страна получателя', effect: 0.38, detail: 'Филиппины — высокий страновой риск' },
+      { name: 'Мерчант категория', effect: 0.29, detail: 'E-wallet — риск отмывания' },
+      { name: 'Частота транзакций', effect: 0.24, detail: '8 операций за последний час' },
+      { name: 'Гео-скорость', effect: 0.18, detail: 'Смена локации за 22 мин' },
+      { name: 'Сумма транзакции', effect: 0.14, detail: '2.1x выше среднего чека' },
+      { name: 'Устройство', effect: 0.11, detail: 'Эмулятор Android' },
+    ],
+    history: [
+      { id: 'TXN-98100', date: '2026-09-10T08:15:00', amount: 305000, merchant: 'Skrill Wallet', score: 72, status: 'CHALLENGE' },
+      { id: 'TXN-98070', date: '2026-09-08T19:40:00', amount: 180000, merchant: 'Coinbase',      score: 58, status: 'CHALLENGE' },
+    ],
+  },
+  {
+    id: 'CASE-4819', txId: 'TXN-98232', createdAt: '2026-09-17T09:33:47', updatedAt: '2026-09-17T11:30:00',
+    status: 'RESOLVED', priority: 'HIGH', assignee: 'Данияр К.',
+    amount: 972000, country: 'VN', merchant: 'Binance P2P', score: 93,
+    card: '5402 9910 2233 4488', ip: '42.115.82.30', device: 'Browser + VPN',
+    notes: 'Подтверждён фрод. Карта заблокирована. Возбуждено дело.',
+    verdict: 'CONFIRMED_FRAUD',
+    shapFactors: [
+      { name: 'VPN / Proxy', effect: 0.45, detail: 'Обнаружен активный VPN-туннель' },
+      { name: 'Мерчант P2P', effect: 0.33, detail: 'Binance P2P — типичный канал отмывания' },
+      { name: 'Страна', effect: 0.27, detail: 'Вьетнам — нетипичная страна для аккаунта' },
+      { name: 'Сумма', effect: 0.21, detail: '4.2x выше среднего чека пользователя' },
+      { name: 'Время', effect: 0.09, detail: '03:47 — ночная активность' },
+      { name: 'Устройство', effect: -0.02, detail: 'Браузер — нейтральный фактор' },
+    ],
+    history: [],
+  },
+  {
+    id: 'CASE-4818', txId: 'TXN-98228', createdAt: '2026-09-17T09:29:36', updatedAt: '2026-09-17T09:29:36',
+    status: 'OPEN', priority: 'HIGH', assignee: null,
+    amount: 730000, country: 'CN', merchant: 'AliExpress', score: 84,
+    card: '5111 2244 5566 7788', ip: '210.12.4.88', device: 'Browser · new',
+    notes: '',
+    shapFactors: [
+      { name: 'Новый браузер/устройство', effect: 0.32, detail: 'Первый вход с данного browser' },
+      { name: 'Страна', effect: 0.28, detail: 'Китай — нетипичная страна' },
+      { name: 'Сумма', effect: 0.24, detail: '3.1x выше среднего чека' },
+      { name: 'Мерчант', effect: 0.11, detail: 'AliExpress — умеренный риск' },
+      { name: 'Частота', effect: 0.08, detail: '3 транзакции за 24ч' },
+      { name: 'IP репутация', effect: -0.03, detail: 'IP не в чёрном списке' },
+    ],
+    history: [
+      { id: 'TXN-98000', date: '2026-09-05T12:00:00', amount: 235000, merchant: 'AliExpress', score: 31, status: 'APPROVE' },
+    ],
+  },
+  {
+    id: 'CASE-4817', txId: 'TXN-98223', createdAt: '2026-09-17T09:24:39', updatedAt: '2026-09-17T12:00:00',
+    status: 'RESOLVED', priority: 'MEDIUM', assignee: 'Айгуль М.',
+    amount: 554000, country: 'UA', merchant: 'Visa Casino', score: 89,
+    card: '4709 3300 5522 8811', ip: '95.67.10.20', device: 'Android Emulator',
+    notes: 'Клиент подтвердил транзакцию — играл сам. Снят флаг фрода.',
+    verdict: 'FALSE_POSITIVE',
+    shapFactors: [
+      { name: 'Мерчант категория', effect: 0.38, detail: 'Онлайн казино — категория высокого риска' },
+      { name: 'Страна', effect: 0.22, detail: 'Украина — нетипичная страна' },
+      { name: 'Эмулятор', effect: 0.19, detail: 'Android Emulator' },
+      { name: 'Частота', effect: 0.14, detail: '9 транзакций за час' },
+      { name: 'Сумма', effect: 0.11, detail: '2.3x выше среднего' },
+      { name: 'Время', effect: -0.05, detail: 'Типичное время активности' },
+    ],
+    history: [],
+  },
+  {
+    id: 'CASE-4816', txId: 'TXN-98219', createdAt: '2026-09-17T09:20:08', updatedAt: '2026-09-17T09:20:08',
+    status: 'OPEN', priority: 'CRITICAL', assignee: null,
+    amount: 1204000, country: 'MA', merchant: 'Bovada Poker', score: 97,
+    card: '5334 7789 0012 3345', ip: '41.214.82.10', device: 'Browser + Proxy',
+    notes: '',
+    shapFactors: [
+      { name: 'Proxy / анонимайзер', effect: 0.48, detail: 'Обнаружен datacenter proxy' },
+      { name: 'Мерчант Poker', effect: 0.35, detail: 'Онлайн покер — крайне высокий риск' },
+      { name: 'Страна', effect: 0.29, detail: 'Марокко — нетипичная страна' },
+      { name: 'Сумма', effect: 0.26, detail: '5.1x выше среднего чека пользователя' },
+      { name: 'Частота', effect: 0.22, detail: '12 транзакций за последний час' },
+      { name: 'Ночное время', effect: 0.08, detail: '02:08 ночи — аномальная активность' },
+    ],
+    history: [],
+  },
+  {
+    id: 'CASE-4815', txId: 'TXN-98210', createdAt: '2026-09-17T09:11:19', updatedAt: '2026-09-17T10:45:00',
+    status: 'IN_REVIEW', priority: 'HIGH', assignee: 'Данияр К.',
+    amount: 770000, country: 'RU', merchant: 'Xiaomi Global', score: 87,
+    card: '4026 4400 8891 2257', ip: '5.188.23.176', device: 'Android Emulator',
+    notes: 'Запрошена верификация по SMS. Ожидаем ответа.',
+    shapFactors: [
+      { name: 'IP репутация', effect: 0.41, detail: 'IP ассоциирован с ботнетом' },
+      { name: 'Эмулятор', effect: 0.33, detail: 'Android Emulator — признак автоматизации' },
+      { name: 'Страна', effect: 0.19, detail: 'Россия — санкционный риск' },
+      { name: 'Сумма', effect: 0.16, detail: '3.2x выше среднего чека' },
+      { name: 'Мерчант', effect: 0.08, detail: 'Xiaomi Global — умеренный риск' },
+      { name: 'Частота', effect: 0.06, detail: '7 операций за сутки' },
+    ],
+    history: [
+      { id: 'TXN-97900', date: '2026-09-01T09:00:00', amount: 240000, merchant: 'MTS Digital', score: 22, status: 'APPROVE' },
+    ],
+  },
+]

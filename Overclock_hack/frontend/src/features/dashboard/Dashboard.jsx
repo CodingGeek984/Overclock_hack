@@ -3,11 +3,17 @@ import StatCard from './StatCard'
 import TxTable from './TxTable'
 import GeoThreatMap from './GeoThreatMap'
 import FraudRingGraph from './FraudRingGraph'
+import ScoreDistribution from './ScoreDistribution'
+import ModelHealthWidget from './ModelHealthWidget'
+import DriftHeatmap from './DriftHeatmap'
 import RulesBuilder from '../rules/RulesBuilder'
 import Card from '../../components/ui/Card'
 import Slider from '../../components/ui/Slider'
 import LossChart from '../../components/charts/LossChart'
-import { DASHBOARD_STATS, LOSS_CURVE, TRANSACTIONS } from '../../services/mockData'
+import {
+  DASHBOARD_STATS, LOSS_CURVE, TRANSACTIONS,
+  SCORE_DISTRIBUTION, MODEL_METRICS, DRIFT_DATA,
+} from '../../services/mockData'
 import { formatKZT } from '../../utils/formatters'
 
 function pointAt(data, threshold) {
@@ -20,34 +26,34 @@ export default function Dashboard() {
   const [threshold, setThreshold] = useState(60)
   const [liveTxs, setLiveTxs] = useState(TRANSACTIONS)
   const [rules, setRules] = useState([{ id: 1, field: 'amount', operator: '>', value: '5000', action: 'BLOCK' }])
-  
+
   const rulesRef = useRef(rules)
   useEffect(() => {
     rulesRef.current = rules
   }, [rules])
-  
+
   useEffect(() => {
     let ws = new WebSocket('ws://localhost:8000/api/v1/ws/transactions')
-    
+
     ws.onmessage = (event) => {
       const tx = JSON.parse(event.data)
-        const mappedCountry = tx.location ? tx.location.split(', ')[1] || 'UN' : 'UN'
-        let finalStatus = tx.risk_score >= 80 ? 'BLOCK' : tx.risk_score >= 50 ? 'CHALLENGE' : 'APPROVE'
-        
-        // Apply Hard Rules
-        rulesRef.current.forEach(rule => {
-          let txValue = tx[rule.field]
-          if (rule.field === 'amount') txValue = tx.amount
-          else if (rule.field === 'country') txValue = mappedCountry
-          else if (rule.field === 'risk_score') txValue = tx.risk_score
+      const mappedCountry = tx.location ? tx.location.split(', ')[1] || 'UN' : 'UN'
+      let finalStatus = tx.risk_score >= 80 ? 'BLOCK' : tx.risk_score >= 50 ? 'CHALLENGE' : 'APPROVE'
 
-          let ruleValue = rule.value
-          if (rule.field === 'amount' || rule.field === 'risk_score') ruleValue = Number(rule.value)
-          
-          if (rule.operator === '>' && txValue > ruleValue) finalStatus = rule.action
-          if (rule.operator === '<' && txValue < ruleValue) finalStatus = rule.action
-          if (rule.operator === '==' && txValue == ruleValue) finalStatus = rule.action
-        })
+      // Apply Hard Rules
+      rulesRef.current.forEach(rule => {
+        let txValue = tx[rule.field]
+        if (rule.field === 'amount') txValue = tx.amount
+        else if (rule.field === 'country') txValue = mappedCountry
+        else if (rule.field === 'risk_score') txValue = tx.risk_score
+
+        let ruleValue = rule.value
+        if (rule.field === 'amount' || rule.field === 'risk_score') ruleValue = Number(rule.value)
+
+        if (rule.operator === '>' && txValue > ruleValue) finalStatus = rule.action
+        if (rule.operator === '<' && txValue < ruleValue) finalStatus = rule.action
+        if (rule.operator === '==' && txValue == ruleValue) finalStatus = rule.action
+      })
 
       const mappedTx = {
         id: tx.id,
@@ -59,11 +65,11 @@ export default function Dashboard() {
         merchant: tx.user_id,
         score: tx.risk_score,
         status: finalStatus,
-        features: tx.features
+        features: tx.features,
       }
       setLiveTxs(prev => [mappedTx, ...prev].slice(0, 100))
     }
-    
+
     return () => ws.close()
   }, [])
 
@@ -72,10 +78,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {stats.map((s) => (
           <StatCard
             key={s.id}
+            id={s.id}
             label={s.label}
             value={s.value}
             unit={s.unit}
@@ -86,6 +94,7 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Trade-off chart + Operating point */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
         <Card
           className="xl:col-span-2"
@@ -101,10 +110,10 @@ export default function Dashboard() {
         <Card title="Operating point" subtitle="Значение в текущей точке">
           <dl className="mt-2 space-y-3">
             {[
-              ['threshold', `${threshold}%`, 'text-zinc-100'],
-              ['fraud_loss', formatKZT(op.fraudLoss), 'text-rose-400'],
-              ['client_friction', `${op.friction.toFixed(2)}`, 'text-zinc-100'],
-              ['false_positive', `${op.fpr.toFixed(2)}%`, 'text-amber-400'],
+              ['threshold',      `${threshold}%`,             'text-zinc-100'],
+              ['fraud_loss',     formatKZT(op.fraudLoss),     'text-rose-400'],
+              ['client_friction',`${op.friction.toFixed(2)}`, 'text-zinc-100'],
+              ['false_positive', `${op.fpr.toFixed(2)}%`,     'text-amber-400'],
             ].map(([k, v, color]) => (
               <div key={k} className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
                 <dt className="text-xs font-mono text-zinc-500">{k}</dt>
@@ -113,20 +122,33 @@ export default function Dashboard() {
             ))}
             <div className="flex items-center justify-between">
               <dt className="text-xs font-mono text-zinc-500">deployed_model</dt>
-              <dd className="text-sm font-mono text-zinc-400">xgboost.3.2k</dd>
+              <dd className="text-sm font-mono text-zinc-400">{MODEL_METRICS.version}</dd>
             </div>
           </dl>
         </Card>
       </div>
 
+      {/* Score Distribution + Model Health */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+        <div className="xl:col-span-2">
+          <ScoreDistribution data={SCORE_DISTRIBUTION} threshold={threshold} />
+        </div>
+        <ModelHealthWidget metrics={MODEL_METRICS} />
+      </div>
+
+      {/* Drift Heatmap */}
+      <DriftHeatmap data={DRIFT_DATA} />
+
+      {/* Geo Map + Rules + Ring Graph */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         <GeoThreatMap transactions={liveTxs} />
         <div className="flex flex-col gap-3">
-          <RulesBuilder onRulesChange={setRules} />
+          <RulesBuilder onRulesChange={setRules} liveTxs={liveTxs} />
           <FraudRingGraph transactions={liveTxs} />
         </div>
       </div>
 
+      {/* Transaction feed */}
       <Card title="Лента транзакций" subtitle="Клик по строке — SHAP-объяснение решения (Live WebSockets)">
         <TxTable transactions={liveTxs} />
       </Card>

@@ -1,12 +1,14 @@
-import { ShieldHalf } from 'lucide-react'
+import { ShieldHalf, FolderSearch } from 'lucide-react'
 
 const TABS = [
   { id: 'dashboard', label: 'Дашборд' },
   { id: 'simulator', label: 'Симулятор' },
-  { id: 'batch', label: 'Batch 100k' },
+  { id: 'batch',     label: 'Batch 100k' },
+  { id: 'cases',     label: 'Кейсы', badge: 4 },
 ]
 
 const LANGS = ['RU', 'KZ', 'EN']
+
 
 export default function Header({ activeTab, onTabChange, lang, onLangChange }) {
   return (
@@ -28,16 +30,22 @@ export default function Header({ activeTab, onTabChange, lang, onLangChange }) {
               key={tab.id}
               type="button"
               onClick={() => onTabChange?.(tab.id)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`relative px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 activeTab === tab.id
                   ? 'bg-zinc-800 text-zinc-100'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {tab.label}
+              {tab.badge && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-rose-500 text-[8px] font-mono text-white font-bold leading-none">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           ))}
         </nav>
+
 
         <div className="flex items-center gap-4 shrink-0">
           <div className="hidden md:flex items-center gap-1.5">
