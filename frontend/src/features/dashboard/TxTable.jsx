@@ -5,7 +5,7 @@ import Modal from '../../components/ui/Modal'
 import ShapChart from '../../components/charts/ShapChart'
 import { useLanguage } from '../../context/LanguageContext'
 import { STATUS } from '../../utils/riskColors'
-import { maskCard, formatDateTime, formatKZT } from '../../utils/formatters'
+import { formatDateTime, formatKZT } from '../../utils/formatters'
 
 const PAGE_SIZE = 10
 
@@ -25,12 +25,11 @@ export default function TxTable({ transactions }) {
   const FILTERS = [
     { id: 'ALL', label: t.txAll, countKey: null },
     { id: STATUS.APPROVE, label: 'Approve' },
-    { id: STATUS.CHALLENGE, label: 'Challenge' },
     { id: STATUS.BLOCK, label: 'Block' },
   ]
 
   const counts = useMemo(() => {
-    const acc = { ALL: transactions.length, [STATUS.APPROVE]: 0, [STATUS.CHALLENGE]: 0, [STATUS.BLOCK]: 0 }
+    const acc = { ALL: transactions.length, [STATUS.APPROVE]: 0, [STATUS.BLOCK]: 0 }
     transactions.forEach((tx) => {
       if (acc[tx.status] !== undefined) acc[tx.status] += 1
     })
@@ -44,10 +43,9 @@ export default function TxTable({ transactions }) {
       if (!matchStatus) return false
       if (!q) return true
       return (
-        tx.ip.toLowerCase().includes(q) ||
-        tx.merchant.toLowerCase().includes(q) ||
         tx.id.toLowerCase().includes(q) ||
-        String(tx.amount).includes(q)
+        String(tx.amount).includes(q) ||
+        String(tx.country ?? '').toLowerCase().includes(q)
       )
     })
   }, [transactions, statusFilter, query])
@@ -98,15 +96,13 @@ export default function TxTable({ transactions }) {
 
       <div className="mt-5 overflow-hidden rounded-3xl border border-zinc-200">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm min-w-[860px]">
+          <table className="w-full text-left text-sm min-w-[540px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-50">
                 <th className="px-4 py-3 font-bold">TXN ID</th>
                 <th className="px-4 py-3 font-bold">{t.thDate}</th>
                 <th className="px-4 py-3 font-bold">{t.thAmount}</th>
-                <th className="px-4 py-3 font-bold">{t.thCard}</th>
-                <th className="px-4 py-3 font-bold">IP</th>
-                <th className="px-4 py-3 font-bold">{t.thMerchant}</th>
+                <th className="px-4 py-3 font-bold">Country</th>
                 <th className="px-4 py-3 font-bold">Score</th>
                 <th className="px-4 py-3 font-bold">{t.thDecision}</th>
               </tr>
@@ -118,15 +114,20 @@ export default function TxTable({ transactions }) {
                   onClick={() => setSelected(tx)}
                   className="border-t border-zinc-100 hover:bg-zinc-50 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{tx.id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      {tx.id}
+                      {tx.created && (
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
+                          <span className="w-1 h-1 rounded-full bg-emerald-500 mr-1" />
+                          {t.newInFeed}
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-zinc-500">{formatDateTime(tx.date)}</td>
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-900">{formatKZT(tx.amount)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{maskCard(tx.card)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">
-                    {tx.ip}
-                    <span className="ml-1.5 text-zinc-400">{tx.country}</span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700 text-xs font-medium">{tx.merchant}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{tx.country}</td>
                   <td className={`px-4 py-3 font-mono text-xs font-bold ${scoreCls(tx.score)}`}>
                     {tx.score}%
                   </td>
@@ -178,9 +179,9 @@ export default function TxTable({ transactions }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
               {[
                 [t.txAmount, formatKZT(selected.amount)],
-                [t.thCard, maskCard(selected.card)],
-                ['IP', `${selected.ip} (${selected.country})`],
-                [t.thMerchant, selected.merchant],
+                ['Country', selected.country],
+                [t.device, selected.device],
+                [t.thDate, formatDateTime(selected.date)],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">{k}</div>
@@ -201,6 +202,22 @@ export default function TxTable({ transactions }) {
                 ]}
               />
             </div>
+
+            {selected.reasons?.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                  {t.expLogTitle}
+                </p>
+                <div className="rounded-2xl bg-zinc-950 text-zinc-200 px-4 py-3.5 font-mono text-xs leading-relaxed">
+                  {selected.reasons.map((reason) => (
+                    <div key={reason} className="flex gap-2">
+                      <span className="text-zinc-600">▸</span>
+                      <span>{reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Risk Score</span>

@@ -125,7 +125,7 @@ function buildLog(params, assessment, seed) {
   log.push({
     time: new Date(t.getTime() + 420),
     level: 'info',
-    text: `XGBoost 3.2k trees: baseline ${BASE_SCORE}%, итоговая вероятность фрода ≈ ${score}%. Top SHAP-фактор: ${top?.name} (${top?.effect > 0 ? '+' : ''}${top?.effect}).`,
+    text: `FraudSeeker v3 (gradient boosting): baseline ${BASE_SCORE}%, итоговая вероятность фрода ≈ ${score}%. Top SHAP-фактор: ${top?.name} (${top?.effect > 0 ? '+' : ''}${top?.effect}).`,
   })
 
   if (status === STATUS.BLOCK) {

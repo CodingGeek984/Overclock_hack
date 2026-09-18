@@ -141,7 +141,7 @@ export function buildSupportReport(payload, opts = {}) {
   const generatedAt = new Date()
 
   const lines = [
-    'FraudShield AI — Explainable AI (XAI) отчет',
+    'FraudSeeker — Explainable AI (XAI) отчет',
     '==========================================',
     '',
     `Отчет:          ${id}`,
@@ -175,7 +175,7 @@ export function buildSupportReport(payload, opts = {}) {
         : 'Пропустить операцию. Отметить в профиле клиента как нормальную гео/сеть активность.',
     '',
     '— Служебная информация —',
-    `Сгенерировано: XAI Explainer v1.0 · FraudShield AI`,
+    `Сгенерировано: XAI Explainer v1.0 · FraudSeeker`,
     analyst !== '—' ? `Аналитик:      ${analyst}` : '',
     '',
   ].filter((line, index, arr) => !(line === '' && arr[index - 1] === '')).join('\n')
@@ -207,7 +207,7 @@ export function buildClientMessage(payload, opts = {}) {
       whatTitle: 'Что делать:',
       doA: 'Если операцию совершали вы — подтвердите её в приложении.',
       doB: 'Если это не вы — карта уже заморожена; обратитесь в поддержку.',
-      bye: 'FraudShield AI · служба безопасности',
+      bye: 'FraudSeeker · служба безопасности',
     },
     kk: {
       hello: 'Құрметті клиент!',
@@ -218,7 +218,7 @@ export function buildClientMessage(payload, opts = {}) {
       whatTitle: 'Не істеу керек:',
       doA: 'Операцияны сіз жасасаңыз — қосымшада растаңыз.',
       doB: 'Бұл сіз емес болсаңыз — карта қатырылды; қолдау қызметіне хабарласыңыз.',
-      bye: 'FraudShield AI · қауіпсіздік қызметі',
+      bye: 'FraudSeeker · қауіпсіздік қызметі',
     },
     en: {
       hello: 'Dear customer!',
@@ -229,7 +229,7 @@ export function buildClientMessage(payload, opts = {}) {
       whatTitle: 'What to do:',
       doA: 'If the operation was yours, please confirm it in the app.',
       doB: 'If it was not you, the card is already frozen; contact support.',
-      bye: 'FraudShield AI · Security',
+      bye: 'FraudSeeker · Security',
     },
   }
 

@@ -7,7 +7,7 @@ export const LANGUAGES = [
 export const TRANSLATIONS = {
   ru: {
     // Header & Navigation
-    appTitle: 'FraudShield AI',
+    appTitle: 'FraudSeeker',
     simulator: 'Live-Симулятор',
     dashboard: 'Дашборд',
     geo: 'Гео-карта',
@@ -63,7 +63,7 @@ export const TRANSLATIONS = {
     statSaved: 'Спасённый бюджет',
     statSavedSub: 'за последние 30 дней',
     statProcessed: 'Обработано транзакций',
-    statProcessedSub: 'Live-поток · 24/7',
+    statProcessedSub: 'поток обработан моделью',
     statFpr: 'False Positive Rate',
     statFprSub: 'порог риска 60%',
     statPrecision: 'Precision',
@@ -88,7 +88,7 @@ export const TRANSLATIONS = {
 
     // TxTable
     txAll: 'Все',
-    txSearchPlaceholder: 'IP / merchant / amount / id',
+    txSearchPlaceholder: 'Сумма / id / страна',
     thDate: 'Дата / время',
     thAmount: 'Сумма',
     thCard: 'Карта',
@@ -101,8 +101,8 @@ export const TRANSLATIONS = {
 
     // Batch & FileDrop
     batchBadge: 'Batch 100k inference',
-    batchTitle: 'Массовый скрининг датасета',
-    batchSubtitle: 'Загружайте CSV и получайте разбивку решений на выборке.',
+    batchTitle: 'Массовый скрининг · Batch-инференс',
+    batchSubtitle: 'Симуляция потока транзакций с фиче-инжинирингом и мгновенным скорингом модели.',
     batchResults: 'Итоги обработки',
     planBlocked: 'Заблокировано',
     planBlockedDesc: 'авто-блок · карта заморожена',
@@ -158,11 +158,42 @@ export const TRANSLATIONS = {
     retry: 'Повторить',
     backendBlockedShort: 'заблокировано фрода',
     dashboardLoading: 'Загрузка данных с сервера...',
+
+    // Create Transaction
+    createTx: 'Создать транзакцию',
+    createTxTitle: 'Новая транзакция',
+    createTxSub: 'Заполните параметры — модель сразу вынесет вердикт',
+    createCta: 'Создать транзакцию',
+    addToFeed: 'Готово · в ленту',
+    createdInFeed: 'Транзакция создана и добавлена в ленту.',
+    newInFeed: 'новая',
+
+    // Model Weights & Batch (Cost Function / ML Engine)
+    modelTitle: 'Настройки модели · Cost Function',
+    modelSub: 'Веса сигналов — бизнес-метрика, балансирующая штраф за пропущенный фрод и фрикцию честных клиентов.',
+    modelSaving: 'сохраняю...',
+    modelSaved: 'веса применены',
+    modelReset: 'Сброс весов',
+    weightHint: 'score = base + Σ(веса сигналов) · rescore всей выборки',
+    weightAmount: 'Сумма',
+    weightGeo: 'Гео-риск',
+    weightVpn: 'VPN / Proxy',
+    weightDevice: 'Устройство',
+    weightVelocity: 'Частота / час',
+    batchCount: 'Размер батча',
+    batchRun: 'Симулировать поток',
+    batchRunning: 'Обработка потока...',
+    batchDone: 'Батч обработан · счётчики обновлены',
+    batchAdded: 'Добавлено',
+    batchBlocked: 'Заблокировано',
+    batchSaved: 'Спасённый бюджет',
+    batchAvgScore: 'Средний score',
+    expLogTitle: 'Explanation log',
   },
 
   kk: {
     // Header & Navigation
-    appTitle: 'FraudShield AI',
+    appTitle: 'FraudSeeker',
     simulator: 'Live-Симулятор',
     dashboard: 'Дашборд',
     geo: 'Гео-карта',
@@ -218,7 +249,7 @@ export const TRANSLATIONS = {
     statSaved: 'Үнемделген бюджет',
     statSavedSub: 'соңғы 30 күн ішінде',
     statProcessed: 'Өңделген транзакциялар',
-    statProcessedSub: 'Live-поток · 24/7',
+    statProcessedSub: 'модель өңдеген ағын',
     statFpr: 'False Positive Rate',
     statFprSub: 'тәуекел шегі 60%',
     statPrecision: 'Precision',
@@ -243,7 +274,7 @@ export const TRANSLATIONS = {
 
     // TxTable
     txAll: 'Барлығы',
-    txSearchPlaceholder: 'IP / merchant / amount / id',
+    txSearchPlaceholder: 'Сома / id / ел',
     thDate: 'Күні / уақыты',
     thAmount: 'Сомасы',
     thCard: 'Карта',
@@ -256,8 +287,8 @@ export const TRANSLATIONS = {
 
     // Batch & FileDrop
     batchBadge: 'Batch 100k inference',
-    batchTitle: 'Деректер жиынын жаппай скринингтеу',
-    batchSubtitle: 'CSV жүктеп, үлгі бойынша шешімдер бөлінісін алыңыз.',
+    batchTitle: 'Жаппай скрининг · Batch-инференс',
+    batchSubtitle: 'Транзакциялар ағынын фиче-инжинирингпен симуляциялау және лезде скорингтеу.',
     batchResults: 'Өңдеу қорытындылары',
     planBlocked: 'Бұғатталды',
     planBlockedDesc: 'авто-блок · карта қатырылды',
@@ -313,11 +344,42 @@ export const TRANSLATIONS = {
     retry: 'Қайталау',
     backendBlockedShort: 'фрод бұғатталды',
     dashboardLoading: 'Серверден деректер жүктелуде...',
+
+    // Create Transaction
+    createTx: 'Транзакция жасау',
+    createTxTitle: 'Жаңа транзакция',
+    createTxSub: 'Параметрлерді толтырыңыз — модель дереу шешім шығарады',
+    createCta: 'Транзакция жасау',
+    addToFeed: 'Дайын · лентаға',
+    createdInFeed: 'Транзакция жасалып, лентаға қосылды.',
+    newInFeed: 'жаңа',
+
+    // Model Weights & Batch (Cost Function / ML Engine)
+    modelTitle: 'Модель параметрлері · Cost Function',
+    modelSub: 'Сигнал салмағы — бизнес-метрика: өткізілген фрод пен адал клиенттер үшін кедергі теңгерімі.',
+    modelSaving: 'сақтауда...',
+    modelSaved: 'салмақтар қолданылды',
+    modelReset: 'Қалпына келтіру',
+    weightHint: 'score = база + Σ(сигнал салмағы) · үлгіні қайта скорингтеу',
+    weightAmount: 'Сома',
+    weightGeo: 'Гео-тәуекел',
+    weightVpn: 'VPN / Proxy',
+    weightDevice: 'Құрылғы',
+    weightVelocity: 'Жиілік / сағат',
+    batchCount: 'Батч өлшемі',
+    batchRun: 'Ағынды симуляциялау',
+    batchRunning: 'Ағын өңделуде...',
+    batchDone: 'Батч өңделді · есептегіштер жаңартылды',
+    batchAdded: 'Қосылды',
+    batchBlocked: 'Бұғатталды',
+    batchSaved: 'Үнемделген бюджет',
+    batchAvgScore: 'Орташа score',
+    expLogTitle: 'Explanation log',
   },
 
   en: {
     // Header & Navigation
-    appTitle: 'FraudShield AI',
+    appTitle: 'FraudSeeker',
     simulator: 'Live Simulator',
     dashboard: 'Dashboard',
     geo: 'Geo Map',
@@ -373,7 +435,7 @@ export const TRANSLATIONS = {
     statSaved: 'Saved budget',
     statSavedSub: 'last 30 days',
     statProcessed: 'Transactions processed',
-    statProcessedSub: 'Live stream · 24/7',
+    statProcessedSub: 'stream processed by model',
     statFpr: 'False Positive Rate',
     statFprSub: 'risk threshold 60%',
     statPrecision: 'Precision',
@@ -397,7 +459,7 @@ export const TRANSLATIONS = {
 
     // TxTable
     txAll: 'All',
-    txSearchPlaceholder: 'IP / merchant / amount / id',
+    txSearchPlaceholder: 'amount / id / country',
     thDate: 'Date / time',
     thAmount: 'Amount',
     thCard: 'Card',
@@ -410,8 +472,8 @@ export const TRANSLATIONS = {
 
     // Batch & FileDrop
     batchBadge: 'Batch 100k inference',
-    batchTitle: 'Mass dataset screening',
-    batchSubtitle: 'Upload a CSV to get a breakdown of decisions on the sample.',
+    batchTitle: 'Mass screening · Batch inference',
+    batchSubtitle: 'Simulate a transaction stream with feature engineering and instant model scoring.',
     batchResults: 'Processing results',
     planBlocked: 'Blocked',
     planBlockedDesc: 'auto-block · card frozen',
@@ -467,6 +529,37 @@ export const TRANSLATIONS = {
     retry: 'Retry',
     backendBlockedShort: 'fraud blocked',
     dashboardLoading: 'Loading data from the server...',
+
+    // Create Transaction
+    createTx: 'Create transaction',
+    createTxTitle: 'New transaction',
+    createTxSub: 'Fill in the parameters — the model will rule right away',
+    createCta: 'Create transaction',
+    addToFeed: 'Done · to the feed',
+    createdInFeed: 'Transaction created and added to the feed.',
+    newInFeed: 'new',
+
+    // Model Weights & Batch (Cost Function / ML Engine)
+    modelTitle: 'Model settings · Cost Function',
+    modelSub: 'Signal weights form the business metric balancing missed-fraud penalty vs. honest-customer friction.',
+    modelSaving: 'saving...',
+    modelSaved: 'weights applied',
+    modelReset: 'Reset weights',
+    weightHint: 'score = base + Σ(signal weights) · full-dataset rescore',
+    weightAmount: 'Amount',
+    weightGeo: 'Geo risk',
+    weightVpn: 'VPN / Proxy',
+    weightDevice: 'Device',
+    weightVelocity: 'Velocity / h',
+    batchCount: 'Batch size',
+    batchRun: 'Simulate stream',
+    batchRunning: 'Processing stream...',
+    batchDone: 'Batch processed · counters updated',
+    batchAdded: 'Added',
+    batchBlocked: 'Blocked',
+    batchSaved: 'Fraud loss saved',
+    batchAvgScore: 'Avg score',
+    expLogTitle: 'Explanation log',
   },
 }
 

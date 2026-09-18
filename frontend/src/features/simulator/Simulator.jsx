@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Banknote, Bot, ChevronDown, ChevronUp, Clock, FileText, Gauge, Play, RotateCcw, Send, Wifi } from 'lucide-react'
+import { AlertTriangle, Banknote, Bot, ChevronDown, ChevronUp, Clock, FileText, Play, RotateCcw, Send } from 'lucide-react'
 import { assessTransaction } from '../../services/fraudApi'
 import { checkTransaction } from '../../services/transactionsApi'
-import { COUNTRIES, DEVICES, MERCHANTS } from '../../services/mockData'
+import { COUNTRIES, DEVICES } from '../../services/mockData'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
@@ -12,15 +12,9 @@ import ShapFactors from '../../components/charts/ShapFactors'
 import Presets from './Presets'
 import XaiLog from './XaiLog'
 import { scoreToStatus, STATUS, STATUS_META } from '../../utils/riskColors'
-import { getDynamicThreshold } from '../../utils/dynamicThresholds'
 import { formatTime } from '../../utils/formatters'
 import { buildClientMessage, buildSupportReport, downloadTextFile } from '../../utils/xaiExplainer'
 import { useLanguage } from '../../context/LanguageContext'
-
-const RULE_ICON = {
-  NIGHT_TIME: '🌙',
-  RISKY_MCC: '🎰',
-}
 
 const FACTOR_CODES = {
   'VPN / Proxy': 'VPN_PROXY',
@@ -41,9 +35,7 @@ const PRESET_KEY = {
 const DEFAULT_FORM = {
   amount: 850000,
   country: 'NG',
-  ip: '194.187.248.1',
   device: 'Android Emulator',
-  merchant: 'Crypto Exchange',
   frequency: 12,
 }
 
@@ -206,22 +198,16 @@ export default function Simulator() {
       params: form,
       assessment: result,
     }
-    const threshold = dynamic.finalThreshold
+    const threshold = 80
     const text =
       kind === 'client'
         ? buildClientMessage(payload, { language: lang })
         : buildSupportReport(payload, { threshold, topN: 5 })
     downloadTextFile(`${result.id}-${kind === 'client' ? 'client' : 'xai-report'}.txt`, text)
   }
-  const dynamic = getDynamicThreshold({ ...form, hour: new Date().getHours() });
-  const finalStatus = result && statusTone && result.score >= dynamic.finalThreshold ? STATUS.BLOCK : statusTone;
+  const finalStatus = statusTone;
   const meta = finalStatus ? STATUS_META[finalStatus] : null;
   const codes = result ? reasonCodes(result.factors) : [];
-
-  const RULE_TEXT = {
-    NIGHT_TIME: t.ruleNight,
-    RISKY_MCC: t.ruleMcc,
-  };
 
   
 
@@ -229,13 +215,6 @@ export default function Simulator() {
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
       <div className="space-y-7 pt-2">
-        <span className="inline-flex items-center gap-2 rounded-full bg-zinc-950 text-white pl-1.5 pr-4 py-1.5 text-xs font-semibold">
-          <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse-soft" />
-          </span>
-          {t.realtimeTag}
-        </span>
-
         <div className="space-y-4">
           <h1 className="text-4xl sm:text-[54px] font-extrabold tracking-tight text-zinc-950 leading-[1.05]">
             {t.mainTitle}
@@ -254,15 +233,12 @@ export default function Simulator() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold tracking-tight text-zinc-950">{t.paramsTitle}</h2>
-              <p className="text-sm text-zinc-500 mt-0.5">
-                {activePreset
-                  ? `${t.presetPrefix}: ${t[PRESET_KEY[activePreset] ?? 'presetLegit']}`
-                  : t.manualInput}
-              </p>
+              {activePreset && (
+                <p className="text-sm text-zinc-500 mt-0.5">
+                  {t.presetPrefix}: {t[PRESET_KEY[activePreset] ?? 'presetLegit']}
+                </p>
+              )}
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-              {t.liveInput}
-            </span>
           </div>
 
           <div className="space-y-4">
@@ -294,23 +270,6 @@ export default function Simulator() {
                   options={COUNTRIES}
                 />
               </Field>
-              <Field label={t.merchant}>
-                <Select
-                  value={form.merchant}
-                  onChange={(v) => setField('merchant', v)}
-                  options={MERCHANTS}
-                />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label={t.ip}
-                value={form.ip}
-                icon={Wifi}
-                placeholder="185.220.101.4"
-                onChange={(e) => setField('ip', e.target.value)}
-              />
               <Field label={t.device}>
                 <Select
                   value={form.device}
@@ -502,40 +461,6 @@ export default function Simulator() {
               </div>
             </>
           )}
-        </div>
-
-        <div className="mt-4 rounded-2xl bg-zinc-950 border border-zinc-800 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-500">
-              <Gauge size={13} className="text-zinc-500" />
-              {t.thresholdTitle}
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-lg font-extrabold tabular-nums text-white">
-                {dynamic.finalThreshold}%
-              </span>
-              <span className="text-xs font-mono text-zinc-600 line-through tabular-nums">
-                {dynamic.baseThreshold}%
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-3 border-t border-white/10 pt-3 flex flex-wrap gap-1.5">
-            {dynamic.isStrict ? (
-              dynamic.rules.map((rule) => (
-                <span
-                  key={rule.id}
-                  className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-zinc-300"
-                >
-                  <span>{RULE_ICON[rule.id] ?? '⚠️'}</span>
-                  {RULE_TEXT[rule.id] ?? rule.label}
-                  <span className="text-rose-300 font-bold">-{rule.penalty}%</span>
-                </span>
-              ))
-            ) : (
-              <span className="text-xs text-zinc-600">{t.noRules}</span>
-            )}
-          </div>
         </div>
       </div>
 

@@ -64,7 +64,7 @@ export function deviceToCode(device) {
   if (DEVICE_EMULATOR.test(d)) return '4'
   if (DEVICE_VPN.test(d)) return '5'
   if (DEVICE_PROXY.test(d)) return '6'
-  if (DEVICE_NEW_MOBILE.test(d)) return '2'
+  if (DEVICE_NEW_MOBILE.test(d) && !/known/i.test(d)) return '2'
   if (DEVICE_DESKTOP.test(d)) return '3'
   if (DEVICE_KNOWN_MOBILE.test(d)) return '1'
   return '1'
@@ -88,6 +88,19 @@ export function detectVpn(ip, device, merchant = '') {
   if (VPN_IP_PATTERNS.some((re) => re.test(haystack))) return 1
   if (/vpn|proxy|emulator/i.test(haystack)) return 1
   return 0
+}
+
+export const CODE_TO_COUNTRY = Object.fromEntries(
+  Object.entries(COUNTRY_CODES).map(([iso, num]) => [String(num), iso]),
+)
+
+export const DEVICE_LABELS = {
+  1: 'Known mobile',
+  2: 'New mobile',
+  3: 'Known desktop',
+  4: 'Android emulator',
+  5: 'Browser + VPN',
+  6: 'Browser + Proxy',
 }
 
 export function countryCodeToName(code) {

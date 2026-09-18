@@ -5,16 +5,10 @@ import { LanguageProvider } from './context/LanguageContext'
 
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const Simulator = lazy(() => import('./features/simulator/Simulator'))
-const BatchView = lazy(() => import('./features/batch/BatchView'))
-const GeoMap = lazy(() => import('./features/geo/GeoMap'))
-const XaiCenter = lazy(() => import('./features/xai/XaiCenter'))
 
 const VIEWS = {
   dashboard: Dashboard,
   simulator: Simulator,
-  batch: BatchView,
-  geo: GeoMap,
-  xai: XaiCenter,
 }
 
 const TAB_STORAGE_KEY = 'app_tab'

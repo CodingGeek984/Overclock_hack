@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Plus, RotateCcw } from 'lucide-react'
 import StatCard from './StatCard'
 import TxTable from './TxTable'
+import CreateTxModal from './CreateTxModal'
+import ModelWeights, { DEFAULT_WEIGHTS } from './ModelWeights'
+import BatchPanel from './BatchPanel'
 import Slider from '../../components/ui/Slider'
 import Spinner from '../../components/ui/Spinner'
 import LossChart from '../../components/charts/LossChart'
@@ -10,8 +13,10 @@ import { LOSS_CURVE, TRANSACTIONS } from '../../services/mockData'
 import {
   fetchStats,
   fetchTransactions,
+  fetchModelConfig,
   mapBackendStats,
-  mapBackendTx,
+  mapBackendTxList,
+  updateModelConfig,
 } from '../../services/transactionsApi'
 import { formatCompactKZT, formatKZT } from '../../utils/formatters'
 
@@ -38,6 +43,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [showCreate, setShowCreate] = useState(false)
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS)
+  const [weightsSaving, setWeightsSaving] = useState(false)
+  const [model, setModel] = useState('fraudseeker.v3')
+  const saveTimer = useRef(null)
 
   const op = pointAt(LOSS_CURVE, threshold)
 
@@ -47,7 +57,7 @@ export default function Dashboard() {
     if (statsRes.ok) setStats(mapBackendStats(statsRes.data))
     else setError(statsRes.error)
 
-    if (txsRes.ok) setTxs(txsRes.data.map(mapBackendTx))
+    if (txsRes.ok) setTxs(mapBackendTxList(txsRes.data))
     else setError((prev) => (prev ? `${prev}; ` : '') + txsRes.error)
 
     setLoading(false)
@@ -58,10 +68,63 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [load, refreshKey])
 
+  useEffect(() => {
+    let alive = true
+    fetchModelConfig().then((res) => {
+      if (!alive) return
+      if (res.ok) {
+        setModel(res.data?.model ?? 'fraudseeker.v3')
+        setWeights((prev) => ({ ...DEFAULT_WEIGHTS, ...(res.data?.weights ?? {}) }))
+      }
+    })
+    return () => {
+      alive = false
+      clearTimeout(saveTimer.current)
+    }
+  }, [])
+
   const handleRetry = () => {
     setLoading(true)
     setError(null)
     setRefreshKey((k) => k + 1)
+  }
+
+  const handleCreated = (row) => {
+    setTxs((prev) => [row, ...prev].slice(0, 500))
+    load()
+  }
+
+  const handleWeightChange = (key, value) => {
+    const next = { ...weights, [key]: value }
+    setWeights(next)
+    setWeightsSaving(true)
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const res = await updateModelConfig({ weights: next })
+      setWeightsSaving(false)
+      if (res.ok) {
+        setModel(res.data?.model ?? model)
+        load()
+      } else {
+        setError(res.error)
+      }
+    }, 600)
+  }
+
+  const handleResetWeights = () => {
+    setWeights(DEFAULT_WEIGHTS)
+    setWeightsSaving(true)
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const res = await updateModelConfig({ weights: DEFAULT_WEIGHTS })
+      setWeightsSaving(false)
+      if (res.ok) {
+        setModel(res.data?.model ?? model)
+        load()
+      } else {
+        setError(res.error)
+      }
+    }, 250)
   }
 
   const STAT_TEXT = {
@@ -105,16 +168,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-10">
       <div className="space-y-3">
-        <span className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          {t.dashBadge}
-        </span>
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-950">
           {t.dashTitle}
         </h1>
-        <p className="text-lg text-zinc-500">
-          {t.dashSubtitle}
-        </p>
       </div>
 
       {error && (
@@ -158,7 +214,7 @@ export default function Dashboard() {
               </p>
             </div>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-zinc-300">
-              xgboost.3.2k
+{model}
             </span>
           </div>
 
@@ -204,6 +260,19 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2">
+          <ModelWeights
+            weights={weights}
+            saving={weightsSaving}
+            onChange={handleWeightChange}
+            onReset={handleResetWeights}
+            t={t}
+          />
+        </div>
+        <BatchPanel onDone={load} t={t} />
+      </div>
+
       <div className="rounded-[32px] bg-white border border-zinc-200 p-6 sm:p-8">
         <div className="flex items-start justify-between gap-3 mb-6">
           <div>
@@ -212,13 +281,17 @@ export default function Dashboard() {
               {t.txFeedSub}
             </p>
           </div>
-          {loading ? (
-            <Spinner size={18} label="" />
-          ) : (
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-600">
-              live · 24/7
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-950 text-white px-4 py-2 text-xs font-bold hover:bg-zinc-800 transition-colors shadow-sm"
+            >
+              <Plus size={14} />
+              {t.createTx}
+            </button>
+            {loading && <Spinner size={18} label="" />}
+          </div>
         </div>
 
         {loading && txs.length === 0 ? (
@@ -230,6 +303,8 @@ export default function Dashboard() {
           <TxTable transactions={txs} />
         )}
       </div>
+
+      <CreateTxModal open={showCreate} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
     </div>
   )
 }

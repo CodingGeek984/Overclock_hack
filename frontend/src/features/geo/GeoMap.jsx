@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { AlertTriangle, Shield, Zap, MapPin, ArrowRight, X, Globe, Wifi } from 'lucide-react'
+import { AlertTriangle, Shield, Zap, MapPin, ArrowRight, X, Globe, Wifi, RotateCcw } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext'
 import { generateGeoEvents, analyzeGeoAnomaly, CITY_COORDS } from '../../utils/geoAnalyzer'
-import { TRANSACTIONS } from '../../services/mockData'
+import { fetchTransactions, mapBackendGeoEvent } from '../../services/transactionsApi'
+import Spinner from '../../components/ui/Spinner'
 import { STATUS } from '../../utils/riskColors'
 import 'leaflet/dist/leaflet.css'
 
@@ -222,11 +223,40 @@ const DEMO_ATTACKS = [
 ]
 
 export default function GeoMap() {
+  const { t } = useLanguage()
   const [filter, setFilter] = useState('all')
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [events, setEvents] = useState(() => generateGeoEvents(TRANSACTIONS))
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [demoRunning, setDemoRunning] = useState(false)
   const mapRef = useRef(null)
+
+  const load = useCallback(async () => {
+    const res = await fetchTransactions()
+    if (res.ok) {
+      const now = Date.now()
+      setEvents(
+        generateGeoEvents(res.data.map((row, i) => mapBackendGeoEvent(row, i, now))),
+      )
+    } else {
+      setError(res.error)
+      setEvents([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(load, 0)
+    return () => clearTimeout(timer)
+  }, [load, refreshKey])
+
+  const handleRetry = () => {
+    setLoading(true)
+    setError(null)
+    setRefreshKey((k) => k + 1)
+  }
 
   const filteredEvents = useMemo(() => {
     if (filter === 'all') return events
@@ -416,6 +446,30 @@ export default function GeoMap() {
 
         <LineArrows lines={polylines} />
       </MapContainer>
+
+      {loading && (
+        <div className="absolute inset-0 z-[1200] flex flex-col items-center justify-center gap-3 bg-zinc-950/70 backdrop-blur-sm">
+          <Spinner size={26} dark label={t.dashboardLoading} />
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1200] w-[min(92%,480px)] rounded-2xl border border-rose-500/30 bg-rose-950/90 backdrop-blur-xl px-4 py-3 flex items-center gap-3 animate-fade-in">
+          <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-rose-200">{t.backendUnavailable}</p>
+            <p className="text-[11px] text-rose-300/80 truncate">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors shrink-0"
+          >
+            <RotateCcw size={12} />
+            {t.retry}
+          </button>
+        </div>
+      )}
 
       <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
         <div className="bg-zinc-950/90 backdrop-blur-xl rounded-2xl border border-white/10 p-1.5 flex gap-1">
