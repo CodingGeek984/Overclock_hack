@@ -46,4 +46,4 @@ def generate_explanation(dto: schemas.TransactionCreate, probability: float) -> 
         return "Транзакция стабильна, отклонений от нормы не обнаружено."
 
     reasons_str = ", ".join(reasons)
-    return f"Транзакция помечена как подозрительная. Риск: {(probability * 100)}%. Обнаружены факторы - {reasons_str}"
+    return f"Риск: {(probability * 100)}%. Обнаружены факторы - {reasons_str}"

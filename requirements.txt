@@ -1,0 +1,18 @@
+# Web and server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
+sqlalchemy
+psycopg2-binary
+
+# Data Science & ML
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+joblib
+
+# Pydantic
+pydantic

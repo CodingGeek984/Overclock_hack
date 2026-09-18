@@ -6,7 +6,7 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate, is_f
         amount=transaction.amount,
         country_code=transaction.country_code,
         device_code=transaction.device_code,
-        velocity_per_hour=transaction.velocity_per_hour,
+        velocity_1h=transaction.velocity_1h,
         vpn=transaction.vpn,
         is_fraud=is_fraud
     )
