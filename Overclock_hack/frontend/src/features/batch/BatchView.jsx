@@ -1,20 +1,48 @@
 import { useRef, useState } from 'react'
-import { CheckCircle2, FolderCog, RotateCcw, ShieldOff, Square, TriangleAlert } from 'lucide-react'
+import { Loader2, RotateCcw, ShieldCheck, ShieldOff, Square, TriangleAlert } from 'lucide-react'
 import FileDrop from './FileDrop'
-import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
+import { useLanguage } from '../../context/LanguageContext'
 import { runBatch } from '../../services/fraudApi'
 import { formatCompactKZT } from '../../utils/formatters'
 
 const BATCH_TOTAL = 10000
 
 export default function BatchView() {
+  const { t } = useLanguage()
   const [fileName, setFileName] = useState(null)
   const [progress, setProgress] = useState(0)
   const [running, setRunning] = useState(false)
   const [summary, setSummary] = useState(null)
   const cancelRef = useRef(null)
+
+  const PLAN_CARDS = [
+    {
+      key: 'blocked',
+      icon: ShieldOff,
+      title: t.planBlocked,
+      desc: t.planBlockedDesc,
+      accent: '#fb7185',
+      tone: 'bg-rose-500',
+    },
+    {
+      key: 'challenged',
+      icon: TriangleAlert,
+      title: '2FA / Suspect',
+      desc: t.planChallengedDesc,
+      accent: '#fbbf24',
+      tone: 'bg-amber-500',
+    },
+    {
+      key: 'approved',
+      icon: ShieldCheck,
+      title: t.planApproved,
+      desc: t.planApprovedDesc,
+      accent: '#34d399',
+      tone: 'bg-emerald-500',
+    },
+  ]
 
   const start = async () => {
     const controller = new AbortController()
@@ -59,96 +87,146 @@ export default function BatchView() {
     setRunning(false)
   }
 
-  const stats = summary
-    ? [
-        { icon: CheckCircle2, label: 'approved', value: summary.approved, text: 'text-emerald-400' },
-        { icon: TriangleAlert, label: 'challenge_2fa', value: summary.challenged, text: 'text-amber-400' },
-        { icon: ShieldOff, label: 'blocked', value: summary.blocked, text: 'text-rose-400' },
-        { icon: FolderCog, label: 'saved', value: formatCompactKZT(summary.valueBlocked), text: 'text-zinc-100' },
-      ]
-    : []
+  const values = summary
+    ? {
+        blocked: summary.blocked,
+        challenged: summary.challenged,
+        approved: summary.approved,
+        saved: summary.valueBlocked,
+      }
+    : null
 
   return (
-    <div className="space-y-5">
-      <Card
-        title="Массовый скрининг"
-        subtitle={`Batch inference на выборке ${BATCH_TOTAL.toLocaleString('ru-RU')} транзакций`}
-      >
-        {!running && !fileName ? (
-          <FileDrop onFile={handleFile} onDemo={handleDemo} />
-        ) : (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-mono text-zinc-300 truncate">{fileName}</span>
-              <Button variant="ghost" size="sm" onClick={reset} disabled={!running && !summary}>
-                <RotateCcw size={13} /> Сброс
-              </Button>
-            </div>
+    <div className="space-y-10">
+      <div className="space-y-3">
+        <span className="inline-flex items-center gap-2 rounded-full bg-zinc-950 text-white px-3.5 py-1.5 text-xs font-semibold">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse-soft" />
+          {t.batchBadge}
+        </span>
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-950">
+          {t.batchTitle}
+        </h1>
+        <p className="text-lg text-zinc-500">{t.batchSubtitle}</p>
+      </div>
 
-            {running && (
-              <div>
-                <div className="flex justify-between text-xs font-mono mb-2">
-                  <span className="text-zinc-500">processing</span>
-                  <span className="text-zinc-200">{progress.toFixed(1)}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-zinc-100 transition-all duration-150"
-                    style={{ width: `${progress}%` }}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+            {t.batchResults}
+          </h2>
+          {(running || fileName) && (
+            <span className="text-sm font-semibold text-zinc-500 truncate max-w-[60%]">{fileName}</span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {PLAN_CARDS.map((plan) => {
+            const Icon = plan.icon
+            const value = values ? values[plan.key] : null
+            return (
+              <div
+                key={plan.key}
+                className="relative overflow-hidden rounded-[28px] bg-zinc-950 text-white p-7"
+              >
+                <div
+                  className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-25"
+                  style={{ backgroundColor: plan.accent }}
+                />
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex items-center justify-center w-11 h-11 rounded-full"
+                    style={{ backgroundColor: `${plan.accent}1f`, color: plan.accent }}
+                  >
+                    <Icon size={20} strokeWidth={2} />
+                  </span>
+                  <span
+                    className="w-2 h-2 rounded-full animate-pulse-soft"
+                    style={{ backgroundColor: plan.accent }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-zinc-600">
-                    {Math.round((progress / 100) * BATCH_TOTAL).toLocaleString('ru-RU')} /
-                    {BATCH_TOTAL.toLocaleString('ru-RU')} tx · ~2ms/tx
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={stop}>
-                    <Square size={11} /> Стоп
-                  </Button>
+
+                <div className="mt-6 text-[40px] font-extrabold tracking-tight leading-none tabular-nums">
+                  {value === null ? (running ? '—' : '—') : value.toLocaleString('ru-RU')}
                 </div>
+                <div className="mt-2 text-lg font-bold tracking-tight">{plan.title}</div>
+                <div className="mt-1 text-sm text-zinc-500">{plan.desc}</div>
+
+                {plan.key === 'blocked' && values && (
+                  <div className="mt-4 rounded-full bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-400 inline-block">
+                    {t.planSaved} {formatCompactKZT(values.saved)}
+                  </div>
+                )}
               </div>
-            )}
+            )
+          })}
+        </div>
+      </div>
 
-            {summary && !running && (
+      {!running && !fileName && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{t.uploadTitle}</h2>
+          <FileDrop onFile={handleFile} onDemo={handleDemo} />
+        </div>
+      )}
+
+      {(running || fileName) && (
+        <div className="space-y-5 animate-fade-in">
+          {running ? (
+            <div className="rounded-[28px] bg-white border border-zinc-200 p-6 sm:p-7">
+              <div className="flex items-center justify-between mb-3">
+                <span className="flex items-center gap-2 text-sm font-semibold text-zinc-600">
+                  <Loader2 size={15} className="animate-spin" />
+                  {t.processing}
+                </span>
+                <span className="text-2xl font-extrabold tracking-tight text-zinc-950 tabular-nums">
+                  {progress.toFixed(1)}%
+                </span>
+              </div>
+              <div className="h-3 rounded-full bg-zinc-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-zinc-950 transition-all duration-150 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs font-mono text-zinc-500">
+                  {Math.round((progress / 100) * BATCH_TOTAL).toLocaleString('ru-RU')} /{' '}
+                  {BATCH_TOTAL.toLocaleString('ru-RU')} tx · ~2ms/tx
+                </span>
+                <Button variant="neutral" size="sm" onClick={stop}>
+                  <Square size={11} /> {t.stop}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            summary && (
               <div className="space-y-5 animate-fade-in">
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                  {stats.map((s) => {
-                    const Icon = s.icon
-                    return (
-                      <div key={s.label} className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3">
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 inline-flex items-center gap-1.5">
-                          <Icon size={12} className={s.text} />
-                          {s.label}
-                        </div>
-                        <div className={`mt-1.5 font-mono text-xl text-zinc-100 ${s.label === 'blocked' || s.label === 'challenge_2fa' || s.label === 'approved' ? s.text : ''}`}>
-                          {s.value}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="rounded-md border border-zinc-800 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-950/50 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                    sample · первые 8
+                <div className="rounded-[28px] bg-white border border-zinc-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+                      {t.sampleFirst}
+                    </span>
+                    <span className="text-xs font-mono text-zinc-500">elapsed {summary.elapsedMs}ms</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm min-w-[440px]">
                       <thead>
-                        <tr className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                          <th className="px-3 py-2 font-medium">ID</th>
-                          <th className="px-3 py-2 font-medium">Сумма</th>
-                          <th className="px-3 py-2 font-medium">Гео</th>
-                          <th className="px-3 py-2 font-medium">Решение</th>
+                        <tr className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-50">
+                          <th className="px-6 py-3 font-bold">ID</th>
+                          <th className="px-6 py-3 font-bold">{t.thAmount}</th>
+                          <th className="px-6 py-3 font-bold">{t.thGeo}</th>
+                          <th className="px-6 py-3 font-bold">{t.thDecision}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {summary.sample.map((row) => (
-                          <tr key={row.id} className="border-t border-zinc-800/70">
-                            <td className="px-3 py-2 font-mono text-xs text-zinc-400">{row.id}</td>
-                            <td className="px-3 py-2 font-mono text-xs text-zinc-300">{formatCompactKZT(row.amount)}</td>
-                            <td className="px-3 py-2 font-mono text-xs text-zinc-500">{row.country}</td>
-                            <td className="px-3 py-2">
+                          <tr key={row.id} className="border-t border-zinc-100">
+                            <td className="px-6 py-3 font-mono text-xs text-zinc-500">{row.id}</td>
+                            <td className="px-6 py-3 font-mono text-xs font-semibold text-zinc-900">
+                              {formatCompactKZT(row.amount)}
+                            </td>
+                            <td className="px-6 py-3 font-mono text-xs text-zinc-500">{row.country}</td>
+                            <td className="px-6 py-3">
                               <Badge status={row.status} size="xs" />
                             </td>
                           </tr>
@@ -158,22 +236,29 @@ export default function BatchView() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3">
-                  <div className="flex-1 font-mono text-xs text-zinc-400 leading-relaxed">
-                    fpr <span className="text-amber-400/90">{summary.fpr}%</span> · saved{' '}
-                    <span className="text-emerald-400/90">{formatCompactKZT(summary.valueBlocked)}</span> ·
-                    precision{' '}
-                    <span className="text-zinc-100">{(summary.approved / summary.total * 100).toFixed(1)}%</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-[28px] bg-zinc-950 px-6 py-5 text-white">
+                  <div className="flex-1 text-sm font-medium text-zinc-300 leading-relaxed">
+                    {t.fpr} <span className="text-amber-400 font-bold">{summary.fpr}%</span> · {t.planSaved}{' '}
+                    <span className="text-emerald-400 font-bold">{formatCompactKZT(summary.valueBlocked)}</span>{' '}
+                    · {t.precision}{' '}
+                    <span className="text-white font-bold">
+                      {((summary.approved / summary.total) * 100).toFixed(1)}%
+                    </span>
                   </div>
-                  <Button variant="primary" size="sm" onClick={start}>
-                    Повторить прогон
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="darkGhost" size="sm" onClick={reset}>
+                      <RotateCcw size={13} /> {t.reset}
+                    </Button>
+                    <Button variant="light" size="sm" onClick={start}>
+                      {t.rerun}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </Card>
+            )
+          )}
+        </div>
+      )}
     </div>
   )
 }

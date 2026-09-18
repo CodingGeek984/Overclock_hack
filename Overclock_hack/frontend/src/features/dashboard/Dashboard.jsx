@@ -1,157 +1,473 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Plus, RotateCcw, Activity, ShieldCheck, Target, TrendingUp } from 'lucide-react'
 import StatCard from './StatCard'
 import TxTable from './TxTable'
-import GeoThreatMap from './GeoThreatMap'
-import FraudRingGraph from './FraudRingGraph'
-import ScoreDistribution from './ScoreDistribution'
-import ModelHealthWidget from './ModelHealthWidget'
-import DriftHeatmap from './DriftHeatmap'
-import RulesBuilder from '../rules/RulesBuilder'
-import Card from '../../components/ui/Card'
-import Slider from '../../components/ui/Slider'
-import LossChart from '../../components/charts/LossChart'
+import CreateTxModal from './CreateTxModal'
+import ModelWeights, { DEFAULT_WEIGHTS } from './ModelWeights'
+import TradeoffVisualizer from './TradeoffVisualizer'
+import UploadPanel from './UploadPanel'
+import Spinner from '../../components/ui/Spinner'
+import { useLanguage } from '../../context/LanguageContext'
+import { TRANSACTIONS } from '../../services/mockData'
 import {
-  DASHBOARD_STATS, LOSS_CURVE, TRANSACTIONS,
-  SCORE_DISTRIBUTION, MODEL_METRICS, DRIFT_DATA,
-} from '../../services/mockData'
-import { formatKZT } from '../../utils/formatters'
+  fetchStats,
+  fetchTransactions,
+  fetchModelConfig,
+  mapBackendStats,
+  mapBackendTxList,
+  updateModelConfig,
+} from '../../services/transactionsApi'
+import { formatCompactKZT, formatKZT } from '../../utils/formatters'
 
-function pointAt(data, threshold) {
-  return data.reduce((acc, p) =>
-    Math.abs(p.threshold - threshold) < Math.abs(acc.threshold - threshold) ? p : acc,
-  )
+// ---------------------------------------------------------------------------
+// Analytics API calls (с Fallback на mock-данные)
+// ---------------------------------------------------------------------------
+
+const ANALYTICS_BASE = '/api/v1/analytics'
+
+/** Загружает KPI с бэкенда, при ошибке возвращает fallback */
+async function fetchAnalyticsKPIs() {
+  try {
+    const res = await fetch(`${ANALYTICS_BASE}/kpis`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return { ok: true, data: await res.json() }
+  } catch (err) {
+    return { ok: false, error: String(err), data: null }
+  }
 }
 
+/** Загружает кривую компромисса, при ошибке возвращает пустой массив */
+async function fetchTradeoffCurve(params = {}) {
+  try {
+    const qs = new URLSearchParams()
+    if (params.avgFraud) qs.set('avg_fraud_amount', params.avgFraud)
+    if (params.friction) qs.set('customer_friction_penalty', params.friction)
+    const res = await fetch(`${ANALYTICS_BASE}/tradeoff?${qs}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return { ok: true, data: await res.json() }
+  } catch (err) {
+    return { ok: false, error: String(err), data: [] }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fallback / Mock values
+// ---------------------------------------------------------------------------
+
+const FALLBACK_STATS = {
+  total: 100_000,
+  blocked: 1_243,
+  safe: 98_757,
+  fraudLossSavedTg: 48_500_000,
+  fprPct: 1.2,
+  precisionPct: 94.2,
+  recallPct: 89.5,
+  optimalThreshold: 62,
+}
+
+// ---------------------------------------------------------------------------
+// KPI stat cards config
+// ---------------------------------------------------------------------------
+
+function buildStatCards(stats, t) {
+  return [
+    {
+      id: 'saved',
+      label: t.statSaved ?? 'Спасённый бюджет',
+      value: formatCompactKZT(stats.fraudLossSavedTg),
+      unit: '',
+      sub: (t.statSavedSub ?? 'за последние 30 дней'),
+      tone: 'dark',
+    },
+    {
+      id: 'processed',
+      label: t.statProcessed ?? 'Обработано транзакций',
+      value: stats.total.toLocaleString('ru-RU'),
+      unit: '',
+      sub: `${stats.blocked.toLocaleString('ru-RU')} ${t.backendBlockedShort ?? 'заблокировано'}`,
+      tone: 'light',
+    },
+    {
+      id: 'fpr',
+      label: t.statFpr ?? 'False Positive Rate',
+      value: stats.fprPct.toFixed(1),
+      unit: '%',
+      sub: t.statFprSub ?? 'ложные блокировки',
+      tone: 'dark',
+    },
+    {
+      id: 'precision',
+      label: t.statPrecision ?? 'Precision',
+      value: stats.precisionPct.toFixed(1),
+      unit: '%',
+      sub: t.statPrecisionSub ?? 'точность модели',
+      tone: 'light',
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// Main Dashboard
+// ---------------------------------------------------------------------------
+
 export default function Dashboard() {
-  const [threshold, setThreshold] = useState(60)
-  const [liveTxs, setLiveTxs] = useState(TRANSACTIONS)
-  const [rules, setRules] = useState([{ id: 1, field: 'amount', operator: '>', value: '5000', action: 'BLOCK' }])
+  const { t } = useLanguage()
 
-  const rulesRef = useRef(rules)
-  useEffect(() => {
-    rulesRef.current = rules
-  }, [rules])
+  // --- State ---
+  const [stats, setStats] = useState(FALLBACK_STATS)
+  const [txs, setTxs] = useState(TRANSACTIONS)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  useEffect(() => {
-    let ws = new WebSocket('ws://localhost:8000/api/v1/ws/transactions')
+  // Trade-off Visualizer state
+  const [tradeoffCurve, setTradeoffCurve] = useState([])
+  const [tradeoffLoading, setTradeoffLoading] = useState(true)
+  const [tradeoffError, setTradeoffError] = useState(null)
 
-    ws.onmessage = (event) => {
-      const tx = JSON.parse(event.data)
-      const mappedCountry = tx.location ? tx.location.split(', ')[1] || 'UN' : 'UN'
-      let finalStatus = tx.risk_score >= 80 ? 'BLOCK' : tx.risk_score >= 50 ? 'CHALLENGE' : 'APPROVE'
+  // Analytics KPI state (extended)
+  const [analyticsKPI, setAnalyticsKPI] = useState(null)
+  const [analyticsError, setAnalyticsError] = useState(null)
 
-      // Apply Hard Rules
-      rulesRef.current.forEach(rule => {
-        let txValue = tx[rule.field]
-        if (rule.field === 'amount') txValue = tx.amount
-        else if (rule.field === 'country') txValue = mappedCountry
-        else if (rule.field === 'risk_score') txValue = tx.risk_score
+  // UI state
+  const [showCreate, setShowCreate] = useState(false)
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS)
+  const [weightsSaving, setWeightsSaving] = useState(false)
+  const [model, setModel] = useState('xgboost.v3.2k')
 
-        let ruleValue = rule.value
-        if (rule.field === 'amount' || rule.field === 'risk_score') ruleValue = Number(rule.value)
+  const saveTimer = useRef(null)
 
-        if (rule.operator === '>' && txValue > ruleValue) finalStatus = rule.action
-        if (rule.operator === '<' && txValue < ruleValue) finalStatus = rule.action
-        if (rule.operator === '==' && txValue == ruleValue) finalStatus = rule.action
-      })
+  // -------------------------------------------------------------------------
+  // Data loading
+  // -------------------------------------------------------------------------
 
-      const mappedTx = {
-        id: tx.id,
-        date: tx.timestamp,
-        amount: tx.amount,
-        card: '**** **** **** ' + Math.floor(1000 + Math.random() * 9000),
-        ip: Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255) + '.0.1',
-        country: mappedCountry,
-        merchant: tx.user_id,
-        score: tx.risk_score,
-        status: finalStatus,
-        features: tx.features,
-      }
-      setLiveTxs(prev => [mappedTx, ...prev].slice(0, 100))
+  const load = useCallback(async () => {
+    // Загружаем транзакции и статы параллельно.
+    // 404 означает «эндпоинт ещё не реализован» → тихий fallback на mock-данные.
+    // Баннер ошибки показываем только при реальных сетевых сбоях (connection refused, timeout).
+    const is404 = (err) => typeof err === 'string' && err.includes('404')
+
+    const [statsRes, txsRes] = await Promise.all([fetchStats(), fetchTransactions()])
+
+    if (statsRes.ok) {
+      setStats(mapBackendStats(statsRes.data))
+    } else if (!is404(statsRes.error)) {
+      setError(statsRes.error)
     }
+    // 404 → молча остаёмся на FALLBACK_STATS
 
-    return () => ws.close()
+    if (txsRes.ok) {
+      setTxs(mapBackendTxList(txsRes.data))
+    } else if (!is404(txsRes.error)) {
+      setError((prev) => (prev ? `${prev}; ` : '') + txsRes.error)
+    }
+    // 404 → молча остаёмся на TRANSACTIONS mock
+
+    setLoading(false)
   }, [])
 
-  const stats = DASHBOARD_STATS
-  const op = pointAt(LOSS_CURVE, threshold)
+
+  const loadAnalytics = useCallback(async () => {
+    // Загружаем KPI аналитики
+    const kpiRes = await fetchAnalyticsKPIs()
+    if (kpiRes.ok) {
+      setAnalyticsKPI(kpiRes.data)
+      // Обновляем stats из KPI API если они более свежие
+      setStats((prev) => ({
+        ...prev,
+        fraudLossSavedTg: kpiRes.data.fraud_loss_saved ?? prev.fraudLossSavedTg,
+        fprPct: kpiRes.data.false_positive_rate ?? prev.fprPct,
+        precisionPct: kpiRes.data.precision ?? prev.precisionPct,
+        total: kpiRes.data.total_transactions ?? prev.total,
+        blocked: kpiRes.data.blocked_transactions ?? prev.blocked,
+        optimalThreshold: kpiRes.data.optimal_threshold ?? prev.optimalThreshold,
+      }))
+      setModel(kpiRes.data.model_name ?? model)
+    } else if (kpiRes.error && !kpiRes.error.includes('404')) {
+      setAnalyticsError(kpiRes.error)
+    }
+    // 404 → analytics API недоступен, Visualizer покажет fallback кривую
+
+    // Загружаем кривую компромисса
+    setTradeoffLoading(true)
+    const curveRes = await fetchTradeoffCurve()
+    if (curveRes.ok && curveRes.data?.length > 0) {
+      setTradeoffCurve(curveRes.data)
+    } else {
+      // При любой ошибке (включая 404) → Visualizer покажет FALLBACK_CURVE
+      setTradeoffCurve([])
+    }
+    setTradeoffLoading(false)
+  }, [model])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Promise.all([load(), loadAnalytics()])
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [load, loadAnalytics, refreshKey])
+
+  useEffect(() => {
+    let alive = true
+    fetchModelConfig().then((res) => {
+      if (!alive) return
+      if (res.ok) {
+        setModel(res.data?.model ?? model)
+        setWeights((prev) => ({ ...DEFAULT_WEIGHTS, ...(res.data?.weights ?? {}) }))
+      }
+    })
+    return () => {
+      alive = false
+      clearTimeout(saveTimer.current)
+    }
+  }, [])
+
+  // -------------------------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------------------------
+
+  const handleRetry = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    setAnalyticsError(null)
+    setRefreshKey((k) => k + 1)
+  }, [])
+
+  const handleCreated = useCallback(
+    (row) => {
+      setTxs((prev) => [row, ...prev].slice(0, 500))
+      load()
+    },
+    [load],
+  )
+
+  const handleWeightChange = useCallback(
+    (key, value) => {
+      const next = { ...weights, [key]: value }
+      setWeights(next)
+      setWeightsSaving(true)
+      clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(async () => {
+        const res = await updateModelConfig({ weights: next })
+        setWeightsSaving(false)
+        if (res.ok) {
+          setModel(res.data?.model ?? model)
+          load()
+        } else if (!res.error?.includes('404')) {
+          // 404 → /api/v1/model/config не реализован, молча игнорируем
+          setError(res.error)
+        }
+      }, 600)
+    },
+    [weights, model, load],
+  )
+
+  const handleResetWeights = useCallback(() => {
+    setWeights(DEFAULT_WEIGHTS)
+    setWeightsSaving(true)
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const res = await updateModelConfig({ weights: DEFAULT_WEIGHTS })
+      setWeightsSaving(false)
+      if (res.ok) {
+        setModel(res.data?.model ?? model)
+        load()
+      } else if (!res.error?.includes('404')) {
+        // 404 → /api/v1/model/config не реализован, молча игнорируем
+        setError(res.error)
+      }
+    }, 250)
+  }, [model, load])
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
+  const statCards = buildStatCards(stats, t)
 
   return (
-    <div className="space-y-5">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        {stats.map((s) => (
-          <StatCard
-            key={s.id}
-            id={s.id}
-            label={s.label}
-            value={s.value}
-            unit={s.unit}
-            delta={s.delta}
-            trend={s.trend}
-            sub={s.sub}
-          />
-        ))}
+    <div className="space-y-10">
+      {/* Page title */}
+      <div className="space-y-3">
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-950">
+          {t.dashTitle ?? 'Fraud Hunter'}
+        </h1>
+        {analyticsKPI && (
+          <p className="text-sm text-zinc-400 font-mono">
+            Оптимальный порог:{' '}
+            <span className="text-zinc-700 font-bold">
+              {analyticsKPI.optimal_threshold ?? stats.optimalThreshold ?? '—'}%
+            </span>
+            {' · '}
+            Спасено:{' '}
+            <span className="text-emerald-600 font-bold">
+              {analyticsKPI.fraud_loss_saved_formatted ?? formatCompactKZT(stats.fraudLossSavedTg)}
+            </span>
+            {' · '}
+            Модель:{' '}
+            <span className="text-zinc-700 font-bold">{model}</span>
+          </p>
+        )}
       </div>
 
-      {/* Trade-off chart + Operating point */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-        <Card
-          className="xl:col-span-2"
-          title="Trade-off"
-          subtitle="Потери от фрода vs фрикция честных клиентов по порогу риска"
-        >
-          <LossChart data={LOSS_CURVE} threshold={threshold} />
-          <div className="mt-4 pt-4 border-t border-zinc-800">
-            <Slider label="Порог риска" value={threshold} onChange={setThreshold} />
+      {/* Error banner */}
+      {error && (
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 flex items-center gap-3 animate-fade-in">
+          <AlertTriangle size={18} className="text-rose-500 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-rose-700">
+              {t.backendUnavailable ?? 'Backend недоступен — показаны демо-данные'}
+            </p>
+            <p className="text-xs text-rose-500 truncate">{error}</p>
           </div>
-        </Card>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-rose-200 px-3.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
+          >
+            <RotateCcw size={13} />
+            {t.retry ?? 'Повторить'}
+          </button>
+        </div>
+      )}
 
-        <Card title="Operating point" subtitle="Значение в текущей точке">
-          <dl className="mt-2 space-y-3">
+      {/* ─── KPI Cards ─── */}
+      <section aria-label="KPI метрики">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {statCards.map((s, i) => (
+            <StatCard
+              key={s.id}
+              label={s.label}
+              value={loading && i === 0 ? '···' : s.value}
+              unit={s.unit}
+              sub={s.sub}
+              tone={s.tone}
+            />
+          ))}
+        </div>
+
+        {/* Extended KPI row (from analytics API) */}
+        {analyticsKPI && (
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              ['threshold',      `${threshold}%`,             'text-zinc-100'],
-              ['fraud_loss',     formatKZT(op.fraudLoss),     'text-rose-400'],
-              ['client_friction',`${op.friction.toFixed(2)}`, 'text-zinc-100'],
-              ['false_positive', `${op.fpr.toFixed(2)}%`,     'text-amber-400'],
-            ].map(([k, v, color]) => (
-              <div key={k} className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
-                <dt className="text-xs font-mono text-zinc-500">{k}</dt>
-                <dd className={`text-sm font-mono ${color}`}>{v}</dd>
+              {
+                label: 'Recall',
+                value: `${analyticsKPI.recall?.toFixed(1) ?? '—'}%`,
+                icon: Activity,
+                color: 'text-emerald-600',
+              },
+              {
+                label: 'F1-Score',
+                value: analyticsKPI.f1_score?.toFixed(3) ?? '—',
+                icon: TrendingUp,
+                color: 'text-violet-600',
+              },
+              {
+                label: 'Optimal Threshold',
+                value: `${analyticsKPI.optimal_threshold ?? '—'}%`,
+                icon: Target,
+                color: 'text-cyan-600',
+              },
+              {
+                label: 'Min Total Cost',
+                value: formatCompactKZT(analyticsKPI.min_total_cost ?? 0),
+                icon: ShieldCheck,
+                color: 'text-amber-600',
+              },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div
+                key={label}
+                className="rounded-2xl bg-zinc-50 border border-zinc-200 px-4 py-3 flex items-center gap-3"
+              >
+                <Icon size={16} className={`${color} shrink-0`} />
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    {label}
+                  </div>
+                  <div className="text-sm font-extrabold font-mono text-zinc-900 mt-0.5">
+                    {value}
+                  </div>
+                </div>
               </div>
             ))}
-            <div className="flex items-center justify-between">
-              <dt className="text-xs font-mono text-zinc-500">deployed_model</dt>
-              <dd className="text-sm font-mono text-zinc-400">{MODEL_METRICS.version}</dd>
-            </div>
-          </dl>
-        </Card>
-      </div>
+          </div>
+        )}
+      </section>
 
-      {/* Score Distribution + Model Health */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+      {/* ─── Trade-off Visualizer + Upload Panel ─── */}
+      <section aria-label="Trade-off анализ и загрузка данных">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {/* Trade-off Visualizer (2/3 width) */}
+          <div className="xl:col-span-2">
+            <TradeoffVisualizer
+              curve={tradeoffCurve}
+              isLoading={tradeoffLoading}
+              apiError={tradeoffError}
+            />
+          </div>
+
+          {/* Upload Panel (1/3 width) */}
+          <div className="xl:col-span-1">
+            <UploadPanel onDone={load} t={t} />
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Model Weights ─── */}
+      <section aria-label="Веса модели">
         <div className="xl:col-span-2">
-          <ScoreDistribution data={SCORE_DISTRIBUTION} threshold={threshold} />
+          <ModelWeights
+            weights={weights}
+            saving={weightsSaving}
+            onChange={handleWeightChange}
+            onReset={handleResetWeights}
+            t={t}
+          />
         </div>
-        <ModelHealthWidget metrics={MODEL_METRICS} />
-      </div>
+      </section>
 
-      {/* Drift Heatmap */}
-      <DriftHeatmap data={DRIFT_DATA} />
+      {/* ─── Transaction Feed ─── */}
+      <section aria-label="Лента транзакций">
+        <div className="rounded-[32px] bg-white border border-zinc-200 p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-3 mb-6">
+            <div>
+              <h3 className="text-xl font-bold tracking-tight text-zinc-950">
+                {t.txFeed ?? 'Лента транзакций'}
+              </h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                {t.txFeedSub ?? 'Последние обработанные транзакции с оценкой риска'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                id="create-tx-btn"
+                onClick={() => setShowCreate(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-zinc-950 text-white px-4 py-2 text-xs font-bold hover:bg-zinc-800 transition-colors shadow-sm"
+              >
+                <Plus size={14} />
+                {t.createTx ?? 'Новая транзакция'}
+              </button>
+              {loading && <Spinner size={18} label="" />}
+            </div>
+          </div>
 
-      {/* Geo Map + Rules + Ring Graph */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        <GeoThreatMap transactions={liveTxs} />
-        <div className="flex flex-col gap-3">
-          <RulesBuilder onRulesChange={setRules} liveTxs={liveTxs} />
-          <FraudRingGraph transactions={liveTxs} />
+          {loading && txs.length === 0 ? (
+            <div className="py-14 flex flex-col items-center gap-3 text-zinc-400">
+              <Spinner size={22} label="" />
+              <span className="text-sm">{t.dashboardLoading ?? 'Загрузка...'}</span>
+            </div>
+          ) : (
+            <TxTable transactions={txs} />
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Transaction feed */}
-      <Card title="Лента транзакций" subtitle="Клик по строке — SHAP-объяснение решения (Live WebSockets)">
-        <TxTable transactions={liveTxs} />
-      </Card>
+      <CreateTxModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={handleCreated}
+      />
     </div>
   )
 }

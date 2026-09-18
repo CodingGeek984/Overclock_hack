@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import { FileUp } from 'lucide-react'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function FileDrop({ onFile, onDemo, accept = '.csv' }) {
+  const { t } = useLanguage()
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
@@ -24,10 +26,10 @@ export default function FileDrop({ onFile, onDemo, accept = '.csv' }) {
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className={`rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${
+      className={`rounded-[28px] border-2 border-dashed p-12 text-center cursor-pointer transition-all ${
         dragOver
-          ? 'border-zinc-500 bg-zinc-900/40'
-          : 'border-zinc-800 bg-zinc-900/20 hover:border-zinc-700'
+          ? 'border-zinc-950 bg-zinc-50 scale-[1.01]'
+          : 'border-zinc-300 bg-zinc-50/50 hover:border-zinc-950 hover:bg-zinc-50'
       }`}
     >
       <input
@@ -42,21 +44,27 @@ export default function FileDrop({ onFile, onDemo, accept = '.csv' }) {
         }}
       />
 
-      <div className="flex flex-col items-center gap-2">
-        <FileUp size={22} className="text-zinc-600" />
-        <p className="text-sm text-zinc-300">
-          {dragOver ? 'Отпустите файл' : 'Перетащите CSV-файл сюда'}
+      <div className="flex flex-col items-center gap-3">
+        <span
+          className={`flex items-center justify-center w-16 h-16 rounded-full transition-colors ${
+            dragOver ? 'bg-zinc-950 text-white' : 'bg-white border border-zinc-200 text-zinc-500'
+          }`}
+        >
+          <FileUp size={26} strokeWidth={1.8} />
+        </span>
+        <p className="text-lg font-bold tracking-tight text-zinc-950">
+          {dragOver ? t.dropActive : t.dropIdle}
         </p>
-        <p className="text-xs font-mono text-zinc-600">mock-100k-sample.csv · клик для выбора</p>
+        <p className="text-sm text-zinc-500 font-mono">{t.dropHint}</p>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation()
             onDemo?.()
           }}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-mono text-zinc-300 hover:bg-zinc-800 transition-colors"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-zinc-950 text-white px-5 py-2.5 text-sm font-semibold hover:bg-zinc-800 transition-colors"
         >
-          демо-файл 10k без загрузки
+          {t.demoBtn}
         </button>
       </div>
     </div>

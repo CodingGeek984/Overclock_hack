@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { Banknote, Clock, Play, RotateCcw, Wifi } from 'lucide-react'
+import { AlertTriangle, Banknote, Bot, ChevronDown, ChevronUp, Clock, FileText, Play, RotateCcw, Send } from 'lucide-react'
 import { assessTransaction } from '../../services/fraudApi'
-import { COUNTRIES, DEVICES, MERCHANTS } from '../../services/mockData'
+import { checkTransaction } from '../../services/transactionsApi'
+import { COUNTRIES, DEVICES } from '../../services/mockData'
 import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
-import RiskGauge from '../../components/charts/RiskGauge'
-import ShapChart from '../../components/charts/ShapChart'
+import RiskDonut from '../../components/charts/RiskDonut'
+import ShapFactors from '../../components/charts/ShapFactors'
 import Presets from './Presets'
 import XaiLog from './XaiLog'
-import { STATUS_META } from '../../utils/riskColors'
+import { scoreToStatus, STATUS, STATUS_META } from '../../utils/riskColors'
 import { formatTime } from '../../utils/formatters'
+import { buildClientMessage, buildSupportReport, downloadTextFile } from '../../utils/xaiExplainer'
+import { useLanguage } from '../../context/LanguageContext'
 
 const FACTOR_CODES = {
   'VPN / Proxy': 'VPN_PROXY',
@@ -24,25 +26,27 @@ const FACTOR_CODES = {
   'Geo Velocity': 'GEO_VELOCITY',
 }
 
+const PRESET_KEY = {
+  legit: 'presetLegit',
+  borderline: 'presetBorderline',
+  fraud: 'presetFraud',
+}
+
 const DEFAULT_FORM = {
-  amount: 15900,
-  country: 'KZ',
-  ip: '178.89.91.22',
-  merchant: 'Kaspi.kz',
-  device: 'iPhone 15 · known',
-  frequency: 1,
+  amount: 850000,
+  country: 'NG',
+  device: 'Android Emulator',
+  frequency: 12,
 }
 
-const PRESET_LABELS = {
-  legit: 'Легитимный',
-  borderline: 'Пограничный 2FA',
-  fraud: 'Критический Фрод',
-}
-
-function Field({ label, children }) {
+function Field({ label, children, dark = false }) {
   return (
     <label className="block">
-      <span className="block text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">
+      <span
+        className={`block text-xs font-semibold mb-1.5 ${
+          dark ? 'text-zinc-400' : 'text-zinc-600'
+        }`}
+      >
         {label}
       </span>
       {children}
@@ -50,15 +54,19 @@ function Field({ label, children }) {
   )
 }
 
-function Select({ value, onChange, options }) {
+function Select({ value, onChange, options, dark = false }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md bg-zinc-950 border border-zinc-800 text-sm text-zinc-100 px-3 py-2 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500/20 hover:border-zinc-700 transition-colors appearance-none"
+      className={`w-full rounded-2xl text-sm px-4 py-2.5 transition-all focus:outline-none focus:ring-2 appearance-none ${
+        dark
+          ? 'bg-white/[0.06] border border-white/10 text-white focus:ring-white/10'
+          : 'bg-zinc-100 border border-transparent text-zinc-900 focus:bg-white focus:ring-zinc-900/10'
+      }`}
     >
       {options.map((o) => (
-        <option key={o.code ?? o} value={o.code ?? o} className="bg-zinc-950">
+        <option key={o.code ?? o} value={o.code ?? o} className={dark ? 'bg-zinc-900' : 'bg-white'}>
           {o.name ?? o}
         </option>
       ))}
@@ -73,13 +81,58 @@ function reasonCodes(factors) {
     .map((f) => FACTOR_CODES[f.name] ?? f.name.toUpperCase().replace(/[^\w]+/g, '_'))
 }
 
+function buildLiveLog(data, risk, status) {
+  const t0 = new Date()
+  const steps = [
+    { time: t0, level: 'info', text: 'POST /api/v1/transactions/check → ответ получен' },
+    {
+      time: new Date(t0.getTime() + 40),
+      level: risk >= 80 ? 'danger' : risk >= 50 ? 'warn' : 'success',
+      text: `risk_score = ${risk}% → ${status}`,
+    },
+    { time: new Date(t0.getTime() + 80), level: 'info', text: data.message || '—' },
+  ]
+  if (data.explanation) {
+    steps.push({
+      time: new Date(t0.getTime() + 120),
+      level: 'warn',
+      text: `explanation: ${data.explanation}`,
+    })
+  }
+  return steps
+}
+
+function buildLiveResult(data) {
+  const risk = Math.max(0, Math.min(100, Math.round((Number(data.risk_score) || 0) * 100)))
+  const status = data.is_fraud
+    ? STATUS.BLOCK
+    : risk >= 50
+      ? STATUS.CHALLENGE
+      : STATUS.APPROVE
+  return {
+    id: data.id != null ? `TX-${data.id}` : `TX-LIVE-${Date.now().toString().slice(-5)}`,
+    score: risk,
+    status,
+    is_fraud: Boolean(data.is_fraud),
+    factors: [],
+    log: buildLiveLog(data, risk, status),
+    latencyMs: 0,
+    backendMessage: data.message ?? '',
+    backendExplanation: data.explanation ?? '',
+  }
+}
+
 export default function Simulator() {
+  const { t, lang } = useLanguage()
   const [form, setForm] = useState(DEFAULT_FORM)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+  const [source, setSource] = useState(null)
   const [shownSteps, setShownSteps] = useState(0)
   const [activePreset, setActivePreset] = useState(null)
   const [showAudit, setShowAudit] = useState(false)
+  const [logOpen, setLogOpen] = useState(true)
   const abortRef = useRef(null)
 
   const setField = (key, value) => {
@@ -95,12 +148,29 @@ export default function Simulator() {
     setLoading(true)
     setResult(null)
     setShownSteps(0)
+    setError(null)
+    setSource(null)
 
     const payload = { ...form, ...(extra ?? {}) }
+
+    const remote = await checkTransaction(payload)
+    if (controller.signal.aborted) return
+
+    if (remote.ok) {
+      setResult(buildLiveResult(remote.data))
+      setSource('live')
+      setLoading(false)
+      return
+    }
+
+    setError(remote.error)
+    setSource('fallback')
     try {
-      const res = await assessTransaction(payload)
+      const fallback = await assessTransaction(payload)
       if (controller.signal.aborted) return
-      setResult(res)
+      setResult(fallback)
+    } catch (err) {
+      console.error('Ошибка при анализе транзакции:', err)
     } finally {
       if (!controller.signal.aborted) setLoading(false)
     }
@@ -109,7 +179,7 @@ export default function Simulator() {
   useEffect(() => {
     if (!result) return
     if (shownSteps >= result.log.length) return
-    const timer = setTimeout(() => setShownSteps((s) => s + 1), 300)
+    const timer = setTimeout(() => setShownSteps((s) => s + 1), 260)
     return () => clearTimeout(timer)
   }, [result, shownSteps])
 
@@ -119,26 +189,62 @@ export default function Simulator() {
     run(preset.values)
   }
 
-  const meta = result ? STATUS_META[result.status] : null
-  const codes = result ? reasonCodes(result.factors) : []
+  const statusTone = result ? scoreToStatus(result.score) : null;
+
+  const handleExport = (kind) => {
+    if (!result || !statusTone) return
+    const payload = {
+      tx: { id: result.id, card: '—', ...form },
+      params: form,
+      assessment: result,
+    }
+    const threshold = 80
+    const text =
+      kind === 'client'
+        ? buildClientMessage(payload, { language: lang })
+        : buildSupportReport(payload, { threshold, topN: 5 })
+    downloadTextFile(`${result.id}-${kind === 'client' ? 'client' : 'xai-report'}.txt`, text)
+  }
+  const finalStatus = statusTone;
+  const meta = finalStatus ? STATUS_META[finalStatus] : null;
+  const codes = result ? reasonCodes(result.factors) : [];
+
+  
+
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
-      <div className="xl:col-span-2 space-y-5">
-        <Card title="Пресеты" subtitle="Заполнение формы одним кликом">
-          <Presets onSelect={handlePreset} />
-        </Card>
+    <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
+      <div className="space-y-7 pt-2">
+        <div className="space-y-4">
+          <h1 className="text-4xl sm:text-[54px] font-extrabold tracking-tight text-zinc-950 leading-[1.05]">
+            {t.mainTitle}
+          </h1>
+          <p className="text-lg text-zinc-500 max-w-[460px] leading-relaxed">{t.mainSubtitle}</p>
+        </div>
 
-        <Card
-          title="Параметры транзакции"
-          subtitle={
-            activePreset ? `пресет: ${PRESET_LABELS[activePreset]}` : 'ручной ввод'
-          }
-        >
+        <div className="pt-1">
+          <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2.5">
+            {t.presetsTitle}
+          </p>
+          <Presets onSelect={handlePreset} activeId={activePreset} />
+        </div>
+
+        <div className="rounded-[28px] bg-white border border-zinc-200 p-6 sm:p-7 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold tracking-tight text-zinc-950">{t.paramsTitle}</h2>
+              {activePreset && (
+                <p className="text-sm text-zinc-500 mt-0.5">
+                  {t.presetPrefix}: {t[PRESET_KEY[activePreset] ?? 'presetLegit']}
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Сумма, ₸"
+                label={t.amount}
                 type="number"
                 min={0}
                 value={form.amount}
@@ -146,7 +252,7 @@ export default function Simulator() {
                 onChange={(e) => setField('amount', Number(e.target.value))}
               />
               <Input
-                label="Частота / час"
+                label={t.frequency}
                 type="number"
                 min={1}
                 max={20}
@@ -156,133 +262,220 @@ export default function Simulator() {
               />
             </div>
 
-            <Field label="Страна">
-              <Select value={form.country} onChange={(v) => setField('country', v)} options={COUNTRIES} />
-            </Field>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input
-                label="IP-адрес"
-                value={form.ip}
-                icon={Wifi}
-                placeholder="185.220.101.4"
-                onChange={(e) => setField('ip', e.target.value)}
-              />
-              <Field label="Мерчант">
-                <Select value={form.merchant} onChange={(v) => setField('merchant', v)} options={MERCHANTS} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label={t.country}>
+                <Select
+                  value={form.country}
+                  onChange={(v) => setField('country', v)}
+                  options={COUNTRIES}
+                />
+              </Field>
+              <Field label={t.device}>
+                <Select
+                  value={form.device}
+                  onChange={(v) => setField('device', v)}
+                  options={DEVICES}
+                />
               </Field>
             </div>
 
-            <Field label="Устройство">
-              <Select value={form.device} onChange={(v) => setField('device', v)} options={DEVICES} />
-            </Field>
-
-            <div className="pt-2 grid grid-cols-2 gap-3">
-              <Button fullWidth variant="ghost" onClick={() => setForm(DEFAULT_FORM)}>
-                <RotateCcw size={14} /> Сброс
+            <div className="pt-1 grid grid-cols-2 gap-3">
+              <Button variant="neutral" onClick={() => setForm(DEFAULT_FORM)}>
+                <RotateCcw size={14} /> {t.reset}
               </Button>
-              <Button fullWidth variant="primary" loading={loading} onClick={() => run()}>
-                <Play size={14} /> Анализ
+              <Button variant="primary" loading={loading} onClick={() => run()}>
+                <Play size={14} /> {t.analyze}
               </Button>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
 
-      <div className="xl:col-span-3 space-y-5">
-        <Card title="Вердикт" subtitle="Risk score · действие · объяснимость">
-          {loading && !result && (
-            <div className="flex items-center justify-center py-16">
-              <Spinner size={20} label="inference..." />
+      <div className="lg:sticky lg:top-24">
+        <div className="rounded-[32px] bg-zinc-950 text-white p-6 sm:p-8 shadow-2xl shadow-zinc-900/20">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                {t.liveVerdict}
+              </div>
+              <h2 className="text-xl font-bold tracking-tight mt-1">{t.xaiInference}</h2>
+            </div>
+            {result ? (
+              <div className="text-right">
+                <div className="font-mono text-xs text-zinc-500">
+                  tx <span className="text-zinc-300">{result.id}</span>
+                </div>
+                <div className="font-mono text-xs text-zinc-500 mt-0.5">
+                  latency <span className="text-zinc-300">{result.latencyMs}ms</span>
+                </div>
+                <div className="font-mono text-[10px] font-bold mt-1">
+                  {source === 'live' && (
+                    <span className="text-emerald-400">● live · backend</span>
+                  )}
+                  {source === 'fallback' && (
+                    <span className="text-amber-400">● fallback · local engine</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse-soft" />
+                {t.engineOnline}
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="mb-5 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 flex items-start gap-2.5 animate-fade-in">
+              <AlertTriangle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-rose-200 leading-relaxed min-w-0">
+                <span className="font-bold block">{t.backendUnavailable}</span>
+                {error}
+                {source === 'fallback' && (
+                  <span className="block mt-1 text-rose-300/80">{t.fallbackMode}</span>
+                )}
+              </p>
             </div>
           )}
 
-          {!loading && !result && (
-            <div className="py-16 text-center text-sm text-zinc-600">
-              Выберите пресет или заполните форму и запустите анализ
-            </div>
-          )}
-
-          {result && (
-            <div className="space-y-5">
-              <RiskGauge value={result.score} label="Risk Score" />
-
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-baseline gap-3 border border-zinc-800 rounded-md px-4 py-3 min-w-0">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 shrink-0">
-                    action
-                  </span>
-                  <span className={`font-mono text-xl font-semibold tracking-tight ${meta?.text}`}>
-                    {meta?.label}
-                  </span>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="font-mono text-xs text-zinc-500">
-                    tx <span className="text-zinc-300">{result.id}</span>
-                  </div>
-                  <div className="font-mono text-xs text-zinc-500">
-                    latency <span className="text-zinc-300">{result.latencyMs}ms</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">
-                  reason_codes
-                </div>
-                <div className="font-mono text-sm text-rose-400">
-                  {codes.length > 0 ? codes.join(', ') : 'no_risk_factors'}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-2">
-                  shap_factors
-                </p>
-                <ShapChart data={result.factors.map((f) => ({ ...f, name: f.name }))} />
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card title="XAI Reasoning" subtitle="Консольный вывод модели">
           {loading && !result ? (
-            <div className="py-4">
-              <XaiLog thinking />
+            <div className="flex flex-col items-center justify-center py-10 gap-4">
+              <RiskDonut value={0} label="thinking" showStatus={false} />
+              <Spinner dark label={t.analyzing} />
             </div>
           ) : (
-            <XaiLog steps={result ? result.log.slice(0, shownSteps) : []} />
-          )}
-          {result && (
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-[10px] font-mono text-zinc-600">
-                decision_time {formatTime(result.log[result.log.length - 1]?.time ?? new Date())}
-              </span>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setShowAudit(true)}>
-                  Audit
-                </Button>
-                <Button variant="neutral" size="sm" onClick={() => run()}>
-                  <RotateCcw size={13} /> Переанализ
-                </Button>
+            <>
+              <RiskDonut value={result?.score ?? 0} />
+
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center justify-between rounded-2xl bg-white/[0.05] px-4 py-3.5">
+                  <span className="text-xs font-semibold text-zinc-500">{t.decision}</span>
+                  <span
+                    className={`text-lg font-extrabold tracking-tight ${
+                      meta ? meta.text : 'text-zinc-600'
+                    }`}
+                  >
+                    {result ? meta.label : t.awaitingInput}
+                  </span>
+                </div>
+
+                {result && (
+                  <div className="flex items-center justify-between rounded-2xl bg-white/[0.05] px-4 py-3.5">
+                    <span className="text-xs font-semibold text-zinc-500">{t.reasonCodes}</span>
+                    <span className="font-mono text-xs font-semibold text-rose-400 text-right">
+                      {codes.length > 0 ? codes.join(', ') : t.noRiskFactors}
+                    </span>
+                  </div>
+                )}
+
+                {result?.backendMessage && (
+                  <div className="rounded-2xl bg-white/[0.05] border border-white/10 p-4 animate-fade-in">
+                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                      <Bot size={12} className="text-zinc-500" />
+                      {t.serverMessage}
+                    </div>
+                    <p className="mt-2 text-sm text-zinc-200 leading-relaxed">{result.backendMessage}</p>
+                    {result.backendExplanation && (
+                      <>
+                        <div className="mt-3 pt-3 border-t border-white/10 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                          {t.serverExplanation}
+                        </div>
+                        <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
+                          {result.backendExplanation}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {!result && !loading && (
+                  <p className="text-sm text-zinc-500 text-center py-2">{t.promptSelectPreset}</p>
+                )}
+
+                {finalStatus && result.factors?.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-500 mb-2.5">
+                      {t.topShapFactors}
+                    </p>
+                    <ShapFactors data={result.factors} limit={3} />
+                  </div>
+                )}
+
+                <div className="rounded-2xl bg-white/[0.03] border border-white/10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setLogOpen((v) => !v)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm font-semibold text-zinc-300">
+                      <Bot size={16} className="text-zinc-500" />
+                      {t.llmAssistant}
+                    </span>
+                    {logOpen ? (
+                      <ChevronUp size={16} className="text-zinc-500" />
+                    ) : (
+                      <ChevronDown size={16} className="text-zinc-500" />
+                    )}
+                  </button>
+                  {logOpen && (
+                    <div className="px-3 pb-3 animate-fade-in">
+                      {loading ? (
+                        <XaiLog thinking />
+                      ) : (
+                        <XaiLog steps={result ? result.log.slice(0, shownSteps) : []} />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {result && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <Button variant="light" size="sm" onClick={() => handleExport('report')}>
+                        <FileText size={13} /> {t.xaiSupportReport}
+                      </Button>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={() => handleExport('client')}
+                      >
+                        <Send size={13} /> {t.xaiClientMessage}
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-mono text-zinc-600">
+                        {t.decisionTime}{' '}
+                        {formatTime(result.log[result.log.length - 1]?.time ?? new Date())}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button variant="darkGhost" size="sm" onClick={() => setShowAudit(true)}>
+                          {t.audit}
+                        </Button>
+                        <Button variant="light" size="sm" onClick={() => run()}>
+                          <RotateCcw size={13} /> {t.reanalyze}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
+            </>
           )}
-        </Card>
+        </div>
       </div>
 
-      <Modal open={showAudit} onClose={() => setShowAudit(false)} title="Audit record" subtitle={result?.id}>
+      <Modal open={showAudit} onClose={() => setShowAudit(false)} title={t.audit} subtitle={result?.id}>
         {result && (
-          <div className="font-mono text-xs text-zinc-400 space-y-3">
+          <div className="font-mono text-xs text-zinc-500 space-y-3">
             {result.log.map((step, i) => (
               <div key={i} className="flex gap-2">
-                <span className="text-zinc-600 shrink-0">{formatTime(step.time)}</span>
-                <span>{step.text}</span>
+                <span className="text-zinc-400 shrink-0">{formatTime(step.time)}</span>
+                <span className="text-zinc-700">{step.text}</span>
               </div>
             ))}
           </div>
         )}
       </Modal>
-    </div>
+    </section>
   )
 }

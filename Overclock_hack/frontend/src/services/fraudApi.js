@@ -20,7 +20,7 @@ function hash(seed) {
   return Math.abs(h) % 100
 }
 
-function buildAssessment(params, seed) {
+export function buildAssessment(params, seed = Math.floor(Math.random() * 100)) {
   const factors = []
   const addFactor = (name, effect, detail, strength = 'medium') => {
     factors.push({ name, effect: Number(effect.toFixed(3)), detail, strength })
@@ -125,7 +125,7 @@ function buildLog(params, assessment, seed) {
   log.push({
     time: new Date(t.getTime() + 420),
     level: 'info',
-    text: `XGBoost 3.2k trees: baseline ${BASE_SCORE}%, итоговая вероятность фрода ≈ ${score}%. Top SHAP-фактор: ${top?.name} (${top?.effect > 0 ? '+' : ''}${top?.effect}).`,
+    text: `FraudSeeker v3 (gradient boosting): baseline ${BASE_SCORE}%, итоговая вероятность фрода ≈ ${score}%. Top SHAP-фактор: ${top?.name} (${top?.effect > 0 ? '+' : ''}${top?.effect}).`,
   })
 
   if (status === STATUS.BLOCK) {

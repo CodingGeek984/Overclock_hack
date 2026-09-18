@@ -5,31 +5,42 @@
 @layer base {
   html,
   body {
-    @apply bg-zinc-950;
+    @apply bg-white;
   }
 
   body {
-    @apply bg-zinc-950 text-zinc-300 font-sans antialiased;
+    @apply bg-white text-zinc-900 font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
   }
 
   ::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #27272a;
+    background: #d4d4d8;
     border-radius: 9999px;
-    border: 2px solid #09090b;
+    border: 3px solid #ffffff;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3f3f46;
+    background: #a1a1aa;
   }
 
   ::selection {
-    background: #3f3f46;
-    color: #f4f4f5;
+    background: #18181b;
+    color: #fafafa;
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
 }

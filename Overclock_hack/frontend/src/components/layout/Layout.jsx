@@ -1,16 +1,11 @@
 import Header from './Header'
 
-export default function Layout({ activeTab, onTabChange, lang = 'RU', onLangChange, children }) {
+export default function Layout({ activeTab, onTabChange, children }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        lang={lang}
-        onLangChange={onLangChange}
-      />
+    <div className="min-h-screen flex flex-col bg-white">
+      <Header activeTab={activeTab} onTabChange={onTabChange} />
 
-      <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 py-6 pb-16">
+      <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 pb-24">
         <div key={activeTab} className="animate-fade-in">
           {children}
         </div>
