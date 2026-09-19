@@ -12,9 +12,10 @@ import {
 const CHECK_ENDPOINT = '/api/v1/transactions/check'
 const STATS_ENDPOINT = '/api/v1/transactions/stats'
 const LIST_ENDPOINT = '/api/v1/transactions/'
-const CREATE_ENDPOINT = '/api/v1/transactions/'
-const MODEL_CONFIG_ENDPOINT = '/api/v1/model/config'
-const BATCH_ENDPOINT = '/api/v1/transactions/batch'
+const MODEL_CONFIG_ENDPOINT = '/api/v1/analytics/model/config'
+
+const ANALYTICS_TRADEOFF_ENDPOINT = '/api/v1/analytics/tradeoff'
+const ANALYTICS_KPIS_ENDPOINT = '/api/v1/analytics/kpis'
 
 export function toBackendCheckPayload(form) {
   return {
@@ -33,7 +34,7 @@ export function checkTransaction(form) {
 
 export function createTransaction(form) {
   const body = toBackendCheckPayload(form)
-  return apiPost(CREATE_ENDPOINT, body)
+  return apiPost(CHECK_ENDPOINT, body)
 }
 
 export function buildCreatedRow(form, data) {
@@ -81,16 +82,65 @@ export async function fetchTransactions() {
   return { ok: true, data: rows }
 }
 
-export function fetchModelConfig() {
-  return apiGet(MODEL_CONFIG_ENDPOINT)
+const WEIGHTS_STORAGE_KEY = 'fraud_hunter_weights_v1'
+
+function readLocalWeights() {
+  try {
+    return JSON.parse(localStorage.getItem(WEIGHTS_STORAGE_KEY)) || {}
+  } catch {
+    return {}
+  }
 }
 
-export function updateModelConfig(patch) {
-  return apiPut(MODEL_CONFIG_ENDPOINT, patch)
+// Деплой-бэкенд (ngrok) документирует только чтение model-config
+// (GET /api/v1/analytics/model/config, без weights). Локальный бэкенд
+// (API_TARGET=http://127.0.0.1:8000) отдаёт writable-форму с weights.
+// Поле заполняется при первом fetchModelConfig.
+let modelConfigWritePath = null
+
+export async function fetchModelConfig() {
+  const res = await apiGet(MODEL_CONFIG_ENDPOINT)
+  if (!res.ok) return res
+  const d = res.data ?? {}
+  modelConfigWritePath =
+    d.model_type != null && d.weights == null ? null : MODEL_CONFIG_ENDPOINT
+  return {
+    ok: true,
+    data: {
+      model: d.model_type ?? d.model ?? null,
+      threshold: d.threshold ?? null,
+      weights: d.weights ?? readLocalWeights(),
+    },
+  }
 }
 
-export function runBatch(payload) {
-  return apiPost(BATCH_ENDPOINT, payload, 60000)
+export async function updateModelConfig(patch) {
+  if (!modelConfigWritePath) {
+    // read-only бэкенд → сохраняем веса локально, без сетевого запроса
+    try {
+      localStorage.setItem(WEIGHTS_STORAGE_KEY, JSON.stringify(patch.weights ?? {}))
+    } catch {
+      /* ignore */
+    }
+    return { ok: true, data: { weights: patch.weights ?? {} } }
+  }
+  const res = await apiPut(modelConfigWritePath, patch)
+  if (res.ok) {
+    try {
+      localStorage.setItem(WEIGHTS_STORAGE_KEY, JSON.stringify(patch.weights ?? {}))
+    } catch {
+      /* ignore */
+    }
+  }
+  return res
+}
+
+export function fetchAnalyticsTradeoff() {
+  return apiGet(ANALYTICS_TRADEOFF_ENDPOINT)
+}
+
+export function fetchAnalyticsKPIs() {
+  return apiGet(ANALYTICS_KPIS_ENDPOINT)
 }
 
 export function mapBackendTxList(rows, now = Date.now()) {

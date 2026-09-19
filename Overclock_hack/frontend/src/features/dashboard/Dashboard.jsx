@@ -5,50 +5,20 @@ import TxTable from './TxTable'
 import CreateTxModal from './CreateTxModal'
 import ModelWeights, { DEFAULT_WEIGHTS } from './ModelWeights'
 import TradeoffVisualizer from './TradeoffVisualizer'
-import UploadPanel from './UploadPanel'
 import Spinner from '../../components/ui/Spinner'
 import { useLanguage } from '../../context/LanguageContext'
 import { TRANSACTIONS } from '../../services/mockData'
 import {
   fetchStats,
   fetchTransactions,
+  fetchAnalyticsTradeoff,
+  fetchAnalyticsKPIs,
   fetchModelConfig,
   mapBackendStats,
   mapBackendTxList,
   updateModelConfig,
 } from '../../services/transactionsApi'
-import { formatCompactKZT, formatKZT } from '../../utils/formatters'
-
-// ---------------------------------------------------------------------------
-// Analytics API calls (с Fallback на mock-данные)
-// ---------------------------------------------------------------------------
-
-const ANALYTICS_BASE = '/api/v1/analytics'
-
-/** Загружает KPI с бэкенда, при ошибке возвращает fallback */
-async function fetchAnalyticsKPIs() {
-  try {
-    const res = await fetch(`${ANALYTICS_BASE}/kpis`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return { ok: true, data: await res.json() }
-  } catch (err) {
-    return { ok: false, error: String(err), data: null }
-  }
-}
-
-/** Загружает кривую компромисса, при ошибке возвращает пустой массив */
-async function fetchTradeoffCurve(params = {}) {
-  try {
-    const qs = new URLSearchParams()
-    if (params.avgFraud) qs.set('avg_fraud_amount', params.avgFraud)
-    if (params.friction) qs.set('customer_friction_penalty', params.friction)
-    const res = await fetch(`${ANALYTICS_BASE}/tradeoff?${qs}`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return { ok: true, data: await res.json() }
-  } catch (err) {
-    return { ok: false, error: String(err), data: [] }
-  }
-}
+import { formatCompactKZT } from '../../utils/formatters'
 
 // ---------------------------------------------------------------------------
 // Fallback / Mock values
@@ -122,6 +92,7 @@ export default function Dashboard() {
 
   // Trade-off Visualizer state
   const [tradeoffCurve, setTradeoffCurve] = useState([])
+  const [tradeoffSnapshot, setTradeoffSnapshot] = useState(null)
   const [tradeoffLoading, setTradeoffLoading] = useState(true)
   const [tradeoffError, setTradeoffError] = useState(null)
 
@@ -188,14 +159,24 @@ export default function Dashboard() {
     }
     // 404 → analytics API недоступен, Visualizer покажет fallback кривую
 
-    // Загружаем кривую компромисса
+    // Загружаем trade-off данные из GET /api/v1/analytics/tradeoff
     setTradeoffLoading(true)
-    const curveRes = await fetchTradeoffCurve()
-    if (curveRes.ok && curveRes.data?.length > 0) {
-      setTradeoffCurve(curveRes.data)
+    const tradeoffRes = await fetchAnalyticsTradeoff()
+    if (tradeoffRes.ok && tradeoffRes.data) {
+      // Живой бэкенд отдаёт одну точку {false_positive_rate_pct, fraud_loss_saved_tg}
+      setTradeoffSnapshot({
+        falsePositiveRatePct: Number(tradeoffRes.data.false_positive_rate_pct) || 0,
+        fraudLossSavedTg: Number(tradeoffRes.data.fraud_loss_saved_tg) || 0,
+      })
+      // Если пришёл массив кривой → используем его для графика
+      if (Array.isArray(tradeoffRes.data)) {
+        setTradeoffCurve(tradeoffRes.data)
+      }
+      setTradeoffError(null)
     } else {
-      // При любой ошибке (включая 404) → Visualizer покажет FALLBACK_CURVE
+      setTradeoffSnapshot(null)
       setTradeoffCurve([])
+      setTradeoffError(tradeoffRes.error ?? null)
     }
     setTradeoffLoading(false)
   }, [model])
@@ -394,23 +375,14 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* ─── Trade-off Visualizer + Upload Panel ─── */}
-      <section aria-label="Trade-off анализ и загрузка данных">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {/* Trade-off Visualizer (2/3 width) */}
-          <div className="xl:col-span-2">
-            <TradeoffVisualizer
-              curve={tradeoffCurve}
-              isLoading={tradeoffLoading}
-              apiError={tradeoffError}
-            />
-          </div>
-
-          {/* Upload Panel (1/3 width) */}
-          <div className="xl:col-span-1">
-            <UploadPanel onDone={load} t={t} />
-          </div>
-        </div>
+      {/* ─── Trade-off Visualizer ─── */}
+      <section aria-label="Trade-off анализ">
+        <TradeoffVisualizer
+          curve={tradeoffCurve}
+          snapshot={tradeoffSnapshot}
+          isLoading={tradeoffLoading}
+          apiError={tradeoffError}
+        />
       </section>
 
       {/* ─── Model Weights ─── */}

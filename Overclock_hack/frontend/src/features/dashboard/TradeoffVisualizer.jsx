@@ -189,7 +189,7 @@ function MetricBadge({ icon: Icon, label, value, sub, color = '#a1a1aa', highlig
  *   isLoading  — флаг загрузки (показывает skeleton)
  *   apiError   — строка с ошибкой API (показывает fallback-баннер)
  */
-export default function TradeoffVisualizer({ curve, isLoading = false, apiError = null }) {
+export default function TradeoffVisualizer({ curve, isLoading = false, apiError = null, snapshot = null }) {
   const [threshold, setThreshold] = useState(60)
   const [isDragging, setIsDragging] = useState(false)
   const [activeMode, setActiveMode] = useState('financial') // 'financial' | 'ml'
@@ -239,12 +239,12 @@ export default function TradeoffVisualizer({ curve, isLoading = false, apiError 
     )
   }
 
-  const savedAmount = currentPoint?.fraud_loss_saved ?? 0
+  const savedAmount = snapshot?.fraudLossSavedTg ?? currentPoint?.fraud_loss_saved ?? 0
   const frictionCost = currentPoint?.customer_inconvenience ?? 0
   const totalCost = currentPoint?.total_cost ?? 0
   const precisionVal = currentPoint?.precision ?? 0
   const recallVal = currentPoint?.recall ?? 0
-  const fprVal = currentPoint?.fpr ?? 0
+  const fprVal = snapshot?.falsePositiveRatePct ?? currentPoint?.fpr ?? 0
 
   return (
     <div

@@ -4,10 +4,12 @@ import Spinner from './components/ui/Spinner'
 import { LanguageProvider } from './context/LanguageContext'
 
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
+const AnalyticsView = lazy(() => import('./features/analytics/AnalyticsView'))
 const Simulator = lazy(() => import('./features/simulator/Simulator'))
 
 const VIEWS = {
   dashboard: Dashboard,
+  analytics: AnalyticsView,
   simulator: Simulator,
 }
 

@@ -104,6 +104,7 @@ class JobStatusResponse(BaseModel):
     features_computed: list[str] = Field(...)
     pipeline_duration_ms: float = Field(...)
     stats: dict[str, Any] = Field(default_factory=dict)
+    model_metrics: dict[str, Any] = Field(default_factory=dict, description="Метрики ML-модели после обучения")
     error: str | None = Field(default=None)
     started_at: float | None = Field(default=None)
     finished_at: float | None = Field(default=None)
@@ -211,7 +212,7 @@ def _normalise_columns(df: "pd.DataFrame", warnings: list[str]) -> "pd.DataFrame
 
 
 def _process_upload_background(content: bytes, filename: str, file_format: str) -> None:
-    """Фоновая обработка загруженного файла."""
+    """Фоновая обработка загруженного файла + дообучение ML-модели."""
     global _last_job
     _last_job["status"] = "running"
     _last_job["started_at"] = time.time()
@@ -225,12 +226,22 @@ def _process_upload_background(content: bytes, filename: str, file_format: str) 
         pipeline = FeatureEngineeringPipeline()
         result = pipeline.run_pipeline(df)
 
+        # Дообучаем реальную ML-модель на новых данных
+        model_metrics: dict[str, Any] = {}
+        try:
+            from services.ml_engine import ENGINE
+
+            model_metrics = ENGINE.fit_pipeline(df)
+        except Exception as exc:
+            model_metrics = {"error": str(exc)}
+
         _last_job.update({
             "status": "done",
             "records_processed": result.records_processed,
             "features_computed": result.features_computed,
             "pipeline_duration_ms": result.pipeline_duration_ms,
             "stats": result.stats,
+            "model_metrics": model_metrics,
             "finished_at": time.time(),
         })
     except Exception as exc:
@@ -329,6 +340,23 @@ async def upload_dataset(
         pipeline = FeatureEngineeringPipeline()
         result = pipeline.run_pipeline(df)
 
+        # Дообучаем реальную ML-модель на новых данных
+        try:
+            from services.ml_engine import ENGINE
+
+            model_metrics = ENGINE.fit_pipeline(df)
+            _last_job["model_metrics"] = model_metrics
+            if model_metrics:
+                auc_val = model_metrics.get('auc')
+                warnings.append(
+                    f"Модель дообучена: xgboost.v3.2k, "
+                    f"{model_metrics.get('train_samples', 0):,} записей, "
+                    f"AUC {auc_val if auc_val is not None else '—'}"
+                )
+        except Exception as exc:
+            _last_job["model_metrics"] = {"error": str(exc)}
+            warnings.append(f"Дообучение модели пропущено: {exc}")
+
         status: Literal["success", "partial", "error"] = (
             "success" if result.records_processed == records_total else "partial"
         )
@@ -383,7 +411,7 @@ async def simulate_stream(
         )
 
     def _run_stream_simulation(rate: int, duration: int) -> None:
-        """Симуляция: генерируем синтетические транзакции и прогоняем через пайплайн."""
+        """Симуляция: генерируем синтетические транзакции, прогоняем через пайплайн и дообучаем модель."""
         from services.feature_engineering import generate_synthetic_dataset
 
         global _last_job
@@ -397,12 +425,21 @@ async def simulate_stream(
             pipeline = FeatureEngineeringPipeline()
             result = pipeline.run_pipeline(df)
 
+            model_metrics: dict[str, Any] = {}
+            try:
+                from services.ml_engine import ENGINE
+
+                model_metrics = ENGINE.fit_pipeline(df)
+            except Exception as exc:
+                model_metrics = {"error": str(exc)}
+
             _last_job.update({
                 "status": "done",
                 "records_processed": result.records_processed,
                 "features_computed": result.features_computed,
                 "pipeline_duration_ms": result.pipeline_duration_ms,
                 "stats": result.stats,
+                "model_metrics": model_metrics,
                 "finished_at": time.time(),
             })
         except Exception as exc:

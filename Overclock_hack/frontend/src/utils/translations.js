@@ -10,8 +10,10 @@ export const TRANSLATIONS = {
     appTitle: 'FraudSeeker',
     simulator: 'Live-Симулятор',
     dashboard: 'Дашборд',
+    analytics: 'Analytics',
     geo: 'Гео-карта',
     xai: 'XAI',
+    batch: 'Batch 100k',
     realtimeTag: 'Real-time Fraud Detection',
 
     // Hero Section
@@ -58,7 +60,7 @@ export const TRANSLATIONS = {
 
     // Dashboard & Transactions
     dashBadge: 'Аналитика и динамические пороги',
-    dashTitle: 'Дашборд аналитика',
+    dashTitle: 'Дашборд',
     dashSubtitle: 'Ключевые метрики модели и живая настройка порога риска.',
     statSaved: 'Спасённый бюджет',
     statSavedSub: 'за последние 30 дней',
@@ -189,6 +191,25 @@ export const TRANSLATIONS = {
     batchSaved: 'Спасённый бюджет',
     batchAvgScore: 'Средний score',
     expLogTitle: 'Explanation log',
+
+    // Analytics page
+    anBadge: 'Аналитика',
+    anTitle: 'Аналитика модели',
+    anSubtitle: 'Ключевые показатели эффективности и текущая конфигурация скоринговой модели.',
+    anLive: 'Live · бэкенд',
+    anOffline: 'данные не получены',
+    anModelConfig: 'Конфигурация модели',
+    anModelType: 'Тип модели',
+    anVersion: 'Версия',
+    anThreshold: 'Порог блокировки',
+    anTotalTx: 'Всего транзакций',
+    anBlocked: 'Заблокировано',
+    anSafe: 'Пропущено',
+    anSaved: 'Спасённый бюджет',
+    anFpr: 'FPR',
+    anPrecision: 'Precision',
+    anRecall: 'Recall',
+    anOptimal: 'Оптимальный порог',
   },
 
   kk: {
@@ -196,8 +217,10 @@ export const TRANSLATIONS = {
     appTitle: 'FraudSeeker',
     simulator: 'Live-Симулятор',
     dashboard: 'Дашборд',
+    analytics: 'Analytics',
     geo: 'Гео-карта',
     xai: 'XAI',
+    batch: 'Batch 100k',
     realtimeTag: 'Нақты уақыттағы фродты анықтау',
 
     // Hero Section
@@ -244,7 +267,7 @@ export const TRANSLATIONS = {
 
     // Dashboard & Transactions
     dashBadge: 'Аналитика және динамикалық шектер',
-    dashTitle: 'Аналитик дашборды',
+    dashTitle: 'Дашборд',
     dashSubtitle: 'Үлгінің негізгі метрикалары және тәуекел шегін тікелей баптау.',
     statSaved: 'Үнемделген бюджет',
     statSavedSub: 'соңғы 30 күн ішінде',
@@ -375,6 +398,25 @@ export const TRANSLATIONS = {
     batchSaved: 'Үнемделген бюджет',
     batchAvgScore: 'Орташа score',
     expLogTitle: 'Explanation log',
+
+    // Analytics page
+    anBadge: 'Аналитика',
+    anTitle: 'Модель аналитикасы',
+    anSubtitle: 'Тиімділіктің негізгі көрсеткіштері және ағымдағы скорингтік модель конфигурациясы.',
+    anLive: 'Live · бэкенд',
+    anOffline: 'деректер алынбады',
+    anModelConfig: 'Модель конфигурациясы',
+    anModelType: 'Модель түрі',
+    anVersion: 'Нұсқа',
+    anThreshold: 'Бұғаттау шегі',
+    anTotalTx: 'Барлық транзакциялар',
+    anBlocked: 'Бұғатталды',
+    anSafe: 'Өткізілді',
+    anSaved: 'Үнемделген бюджет',
+    anFpr: 'FPR',
+    anPrecision: 'Precision',
+    anRecall: 'Recall',
+    anOptimal: 'Оңтайлы шек',
   },
 
   en: {
@@ -382,8 +424,10 @@ export const TRANSLATIONS = {
     appTitle: 'FraudSeeker',
     simulator: 'Live Simulator',
     dashboard: 'Dashboard',
+    analytics: 'Analytics',
     geo: 'Geo Map',
     xai: 'XAI',
+    batch: 'Batch 100k',
     realtimeTag: 'Real-time Fraud Detection',
 
     // Hero Section
@@ -430,7 +474,7 @@ export const TRANSLATIONS = {
 
     // Dashboard & Transactions
     dashBadge: 'Analytics & Dynamic Thresholds',
-    dashTitle: 'Analytics dashboard',
+    dashTitle: 'Dashboard',
     dashSubtitle: 'Key model metrics and live risk threshold tuning.',
     statSaved: 'Saved budget',
     statSavedSub: 'last 30 days',
@@ -560,6 +604,25 @@ export const TRANSLATIONS = {
     batchSaved: 'Fraud loss saved',
     batchAvgScore: 'Avg score',
     expLogTitle: 'Explanation log',
+
+    // Analytics page
+    anBadge: 'Аналитика',
+    anTitle: 'Model analytics',
+    anSubtitle: 'Core performance metrics and the live scoring-model configuration.',
+    anLive: 'Live · backend',
+    anOffline: 'no data received',
+    anModelConfig: 'Model configuration',
+    anModelType: 'Model type',
+    anVersion: 'Version',
+    anThreshold: 'Blocking threshold',
+    anTotalTx: 'Total transactions',
+    anBlocked: 'Blocked',
+    anSafe: 'Allowed',
+    anSaved: 'Fraud loss saved',
+    anFpr: 'FPR',
+    anPrecision: 'Precision',
+    anRecall: 'Recall',
+    anOptimal: 'Optimal threshold',
   },
 }
 

@@ -3,6 +3,7 @@ import LanguageSelector from '../ui/LanguageSelector'
 
 const TABS = [
   { id: 'dashboard', key: 'dashboard', short: 'Дашборд' },
+  { id: 'analytics', key: 'analytics', short: 'Analytics' },
   { id: 'simulator', key: 'simulator', short: 'Live' },
 ]
 
@@ -38,7 +39,7 @@ export default function Header({ activeTab, onTabChange }) {
                   : 'text-zinc-500 hover:text-zinc-900'
               }`}
             >
-              {tab.key ? t[tab.key] : 'Batch 100k'}
+{tab.key ? t[tab.key] : 'Дашборд'}
             </button>
           ))}
         </nav>
@@ -49,7 +50,7 @@ export default function Header({ activeTab, onTabChange }) {
               key={tab.id}
               type="button"
               onClick={() => onTabChange?.(tab.id)}
-              aria-label={tab.key ? t[tab.key] : 'Batch 100k'}
+              aria-label={tab.key ? t[tab.key] : 'Дашборд'}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === tab.id
                   ? 'bg-white text-zinc-950 shadow-sm'

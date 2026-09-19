@@ -1,16 +1,52 @@
-# React + Vite
+# Fraud Hunter — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React-приложение — дашборд антифрод-системы: мониторинг транзакций, аналитика модели и XAI-симулятор. Стек: **React 19 + Vite 8 + Tailwind CSS 3**, иконки — Lucide, графики — Recharts, карта — Leaflet.
 
-Currently, two official plugins are available:
+## Быстрый старт
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev       # http://localhost:5173
+```
 
-## React Compiler
+## Вкладки
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Dashboard** — KPI-карточки, trade-off кривая, веса модели, лента транзакций, создание транзакции.
+- **Analytics** — метрики модели: KPI, конфигурация, optimal threshold, trade-off анализ.
+- **Simulator** — ручная проверка транзакции с объяснением решения (SHAP-факторы, лог, экспорт отчетов).
 
-## Expanding the Oxlint configuration
+Языки интерфейса: RU/EN (переключатель в шапке, выбор сохраняется в localStorage).
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Структура
+
+```
+src/
+├── components/     # UI-кит (Button, Card, Modal...), layout, графики (charts/)
+├── context/        # Языковой контекст (RU/EN)
+├── features/       # Один каталог на вкладку: dashboard/, analytics/, simulator/, geo/
+├── services/       # API-слой (api.js, transactionsApi.js, fraudApi.js, mockData.js)
+└── utils/          # Форматтеры, переводы, XAI-объяснения, geo-анализ, цвета риска
+```
+
+## Подключение к бэкенду
+
+Запросы идут через Vite-proxy (same-origin, без CORS). Целевой адрес — в `vite.config.js`:
+
+```bash
+# Локальный FastAPI-бэкенд
+API_TARGET="http://127.0.0.1:8000" npm run dev
+
+# Или напрямую в браузере
+VITE_API_URL="https://your-host/api" npm run dev
+```
+
+По умолчанию цель — деплой-бэкенд через ngrok (заголовок `ngrok-skip-browser-warning` добавляет прокси). Если бэкенд недоступен или эндпоинт вернул 404 — приложение молча работает на mock-данных.
+
+## Команды
+
+```bash
+npm run dev       # dev-сервер
+npm run build     # продакшен-сборка
+npm run preview   # превью сборки (тоже с прокси)
+npm run lint      # oxlint
+```

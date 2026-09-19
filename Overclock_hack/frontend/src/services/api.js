@@ -1,6 +1,9 @@
-// Same-origin: requests go through the Vite dev/preview proxy to the backend
-// (see vite.config.js), avoiding cross-origin CORS preflights entirely.
-// Override with VITE_API_URL to call some backend directly.
+// Same-origin по умолчанию: запросы идут через Vite-proxy на ngrok-бэкенд
+// (см. vite.config.js — target ngrok, заголовок ngrok-skip-browser-warning
+// добавляется на стороне прокси, DNS резолвится в Node, а не в браузере
+// → нет ERR_NAME_NOT_RESOLVED и CORS-префлайтов).
+// Прямые кросс-доменные вызовы доступны через VITE_API_URL,
+// тогда заголовки ниже применяются браузером к каждому запросу.
 export const BASE_URL = import.meta.env.VITE_API_URL || ''
 
 export const DEFAULT_HEADERS = {

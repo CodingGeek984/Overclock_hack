@@ -134,6 +134,17 @@ def _get_default_cost_engine() -> CostEngine:
     )
 
 
+def _real_prediction_data() -> tuple:
+    """Возвращает (y_true, y_prob, fraud_amounts) реальной модели или None."""
+    from services.ml_engine import ENGINE
+
+    if ENGINE.model is None or ENGINE.eval_y_true is None:
+        return None
+    if ENGINE.eval_proba is None or ENGINE.eval_amounts is None:
+        return None
+    return ENGINE.eval_y_true, ENGINE.eval_proba, ENGINE.eval_amounts
+
+
 def _build_kpi_mock() -> KPIData:
     """
     Генерирует реалистичные KPI на основе синтетической кривой компромисса.
@@ -184,6 +195,93 @@ def _build_kpi_mock() -> KPIData:
     )
 
 
+def _build_kpi_from_model() -> KPIData:
+    """
+    Строит KPI из реальных прогнозов XGBoost (eval-выборка ENGINE):
+    поиск оптимального порога через CostEngine по фактической кривой.
+    """
+    data = _real_prediction_data()
+    engine = _get_default_cost_engine()
+    if data is None:
+        return _build_kpi_mock()
+
+    y_true, y_prob, fraud_amounts = data
+
+    # Для расчёта балансированной кривой используем неискажённый объём:
+    # eval-выборка несбалансирована (немного фрода) — считаем бизнес-метрики
+    # на масштабе 100k транзакций с сохранением базовой частоты фрода.
+    base_fraud_rate = float(y_true.mean())
+    report = engine.find_optimal_threshold(y_true, y_prob, fraud_amounts)
+    opt = report.optimal
+
+    total_tx = 100_000
+    n_fraud = int(total_tx * base_fraud_rate)
+    n_legit = total_tx - n_fraud
+
+    precision_at_opt = opt.precision
+    recall_at_opt = opt.recall
+
+    tp = int(n_fraud * opt.recall)
+    fp = int(tp / (precision_at_opt + 1e-9) - tp) if precision_at_opt > 0 else 0
+    fp = max(0, min(fp, n_legit))
+    blocked = tp + fp
+    safe = total_tx - blocked
+
+    f1 = (
+        2 * precision_at_opt * recall_at_opt / (precision_at_opt + recall_at_opt + 1e-9)
+        if (precision_at_opt + recall_at_opt) > 0 else 0.0
+    )
+
+    avg_fraud_amount = engine.config.avg_fraud_amount
+    saved = float(opt.fraud_loss_saved)
+    # fraud_loss_saved на eval-выборке — реальная сумма; масштабируем до 100k
+    scale = (n_fraud / max(1, int(y_true.sum()))) if int(y_true.sum()) > 0 else 1.0
+    saved_scaled = saved * scale
+
+    return KPIData(
+        total_transactions=total_tx,
+        fraud_loss_saved=round(saved_scaled, 2),
+        fraud_loss_saved_formatted=_format_currency(saved_scaled),
+        false_positive_rate=round(opt.fpr * 100, 2),
+        precision=round(precision_at_opt * 100, 2),
+        recall=round(recall_at_opt * 100, 2),
+        f1_score=round(f1, 4),
+        blocked_transactions=blocked,
+        safe_transactions=safe,
+        optimal_threshold=round(opt.threshold * 100, 2),
+        min_total_cost=round(opt.total_cost, 2),
+        avg_fraud_amount=avg_fraud_amount,
+        model_name="xgboost.v3.2k",
+    )
+
+
+def _build_curve_from_model(n_points: int) -> list[TradeoffDataPoint] | None:
+    """Строит кривую компромисса по реальным прогнозам модели (или None)."""
+    data = _real_prediction_data()
+    if data is None:
+        return None
+    y_true, y_prob, fraud_amounts = data
+    engine = _get_default_cost_engine()
+    try:
+        curve = engine.build_tradeoff_curve(y_true, y_prob, fraud_amounts, n_points=n_points)
+    except Exception:
+        return None
+    return [
+        TradeoffDataPoint(
+            threshold=pt.threshold,
+            precision=pt.precision,
+            recall=pt.recall,
+            f1=pt.f1,
+            fraud_loss=pt.fraud_loss,
+            customer_inconvenience=pt.customer_inconvenience,
+            total_cost=pt.total_cost,
+            fraud_loss_saved=pt.fraud_loss_saved,
+            fpr=pt.fpr,
+        )
+        for pt in curve
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -202,11 +300,11 @@ def get_kpis() -> KPIData:
     """
     Модуль A: KPI Cards для главной страницы дашборда.
 
-    При отсутствии подключённой ML-модели возвращает реалистичные данные
-    на основе синтетической кривой компромисса.
+    При наличии обученной ML-модели считает метрики по РЕАЛЬНЫМ прогнозам
+    (eval-выборка XGBoost + CostEngine). Иначе — реалистичные mock-данные.
     """
     try:
-        return _build_kpi_mock()
+        return _build_kpi_from_model()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ошибка расчёта KPI: {exc}") from exc
 
@@ -236,6 +334,10 @@ def get_tradeoff_data(
     бизнес-параметров пользователем.
     """
     try:
+        real_curve = _build_curve_from_model(n_points=n_points)
+        if real_curve is not None:
+            return real_curve
+
         engine = CostEngine(
             CostEngineConfig(
                 avg_fraud_amount=avg_fraud_amount,
@@ -290,25 +392,6 @@ def get_optimal_threshold(
     try:
         import numpy as np
 
-        # Синтетические данные для демонстрации (в production — реальные предсказания модели)
-        rng = np.random.default_rng(42)
-        n = 10_000
-        n_fraud = 200
-
-        y_true = np.zeros(n, dtype=np.int8)
-        y_true[:n_fraud] = 1
-
-        # Симулируем правдоподобные вероятности: фрод имеет высокий score
-        y_prob = np.concatenate([
-            rng.beta(5, 2, n_fraud),           # fraud: высокие вероятности
-            rng.beta(1.5, 8, n - n_fraud),     # legit: низкие вероятности
-        ])
-
-        fraud_amounts = np.concatenate([
-            rng.uniform(100_000, 500_000, n_fraud),
-            np.zeros(n - n_fraud),
-        ])
-
         engine = CostEngine(
             CostEngineConfig(
                 avg_fraud_amount=avg_fraud_amount,
@@ -316,6 +399,26 @@ def get_optimal_threshold(
                 threshold_resolution=200,
             )
         )
+
+        # Реальные прогнозы обученной XGBoost-модели (если есть)
+        data = _real_prediction_data()
+        if data is not None:
+            y_true, y_prob, fraud_amounts = data
+        else:
+            # Fallback: синтетические правдоподобные вероятности
+            rng = np.random.default_rng(42)
+            n = 10_000
+            n_fraud = 200
+            y_true = np.zeros(n, dtype=np.int8)
+            y_true[:n_fraud] = 1
+            y_prob = np.concatenate([
+                rng.beta(5, 2, n_fraud),
+                rng.beta(1.5, 8, n - n_fraud),
+            ])
+            fraud_amounts = np.concatenate([
+                rng.uniform(100_000, 500_000, n_fraud),
+                np.zeros(n - n_fraud),
+            ])
 
         report = engine.find_optimal_threshold(y_true, y_prob, fraud_amounts)
         opt = report.optimal

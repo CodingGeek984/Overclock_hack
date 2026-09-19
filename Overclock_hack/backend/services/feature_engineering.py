@@ -161,16 +161,25 @@ class FeatureEngineeringPipeline:
 
         window_str = f"{window_days}D"
 
-        # Скользящие среднее и std с временным окном
+        # Скользящие среднее и std с временным окном.
+        # Возвращаем только агрегаты: pandas 3.x исключает grouping-колонки из
+        # результатов groupby.apply(), поэтому индексы сохраняем отдельно.
         def _rolling_stats(group: pd.DataFrame) -> pd.DataFrame:
             ts_index = group.set_index(time_col)[amount_col]
             rolling = ts_index.rolling(window=window_str, min_periods=1)
-            group = group.copy()
-            group["_roll_mean"] = rolling.mean().values
-            group["_roll_std"] = rolling.std(ddof=1).fillna(0).values
-            return group
+            return pd.DataFrame(
+                {
+                    "_roll_mean": rolling.mean().to_numpy(dtype=float),
+                    "_roll_std": rolling.std(ddof=1).fillna(0).to_numpy(dtype=float),
+                },
+                index=group.index,
+            )
 
-        df = df.groupby(user_col, group_keys=False).apply(_rolling_stats)
+        rolling_stats = df.groupby(user_col, group_keys=False).apply(_rolling_stats)
+        rolling_stats = rolling_stats.reindex(df.index)
+
+        df["_roll_mean"] = rolling_stats["_roll_mean"].to_numpy(dtype=float)
+        df["_roll_std"] = rolling_stats["_roll_std"].to_numpy(dtype=float)
 
         df["amount_z_score"] = np.where(
             df["_roll_std"] > 0,
@@ -411,50 +420,95 @@ class FeatureEngineeringPipeline:
 
 def generate_synthetic_dataset(n_rows: int = 1000, seed: int = 42) -> pd.DataFrame:
     """
-    Генерирует синтетический датасет транзакций для демонстрации и тестирования.
+    Генерирует реалистичный синтетический датасет транзакций с перекрытием
+    классов (AUC модели < 1.0), velocity-паттернами и VPN-следами.
+
+    Паттерны рынка:
+      - легитимные: суммы ~ log-normal, частота 1–4 операций в час,
+        геолокация Казахстан, внутренние IP;
+      - мошеннические: суммы с тяжёлым хвостом, резкие burst-паттерны
+        (Velocity 1h / 24h), иногда VPN-IP и «невозможные перелёты».
 
     Примерно 2% записей помечены как мошеннические.
     """
     rng = np.random.default_rng(seed)
 
     n_users = max(1, n_rows // 50)
-    user_ids = [f"USR-{i:05d}" for i in range(n_users)]
+    user_ids = np.array([f"USR-{i:05d}" for i in range(n_users)])
+
+    # Индекс пользователя для каждой строки
+    user_row = rng.integers(0, n_users, size=n_rows)
 
     base_ts = pd.Timestamp("2026-01-01", tz="UTC")
-    timestamps = pd.to_datetime(
-        [base_ts + pd.Timedelta(seconds=int(s)) for s in rng.integers(0, 60 * 24 * 3600, size=n_rows)]
-    )
-
     is_fraud = (rng.random(n_rows) < 0.02).astype(int)
 
-    # Легитимные транзакции: небольшие суммы, Казахстан
+    # Суммы: логнормальные с длинным хвостом в обоих классах → перекрытие
     amounts = np.where(
-        is_fraud,
-        rng.uniform(500_000, 2_000_000, n_rows),   # крупные суммы у фродеров
-        rng.exponential(50_000, n_rows),            # exponential для легитимных
+        is_fraud == 1,
+        rng.lognormal(mean=12.3, sigma=2.0, size=n_rows),   # ~ 220k медиана
+        rng.lognormal(mean=10.6, sigma=1.7, size=n_rows),    # ~  40k медиана
     )
+    amounts = np.clip(amounts, 100, 6_000_000).round(2)
 
-    # Геолокация
+    # Геолокация: у фродеров 60% «привычная», 40% — случайные координаты мира
+    local_mask = (is_fraud == 0) | (rng.random(n_rows) < 0.6)
     lat = np.where(
-        is_fraud,
-        rng.uniform(-90, 90, n_rows),              # случайные координаты у фродеров
-        rng.normal(43.25, 2.5, n_rows),             # Казахстан
+        local_mask,
+        rng.normal(43.25, 2.2, n_rows),
+        rng.uniform(-60, 60, n_rows),
     )
     lon = np.where(
-        is_fraud,
-        rng.uniform(-180, 180, n_rows),
-        rng.normal(76.89, 5.0, n_rows),
+        local_mask,
+        rng.normal(76.89, 4.0, n_rows),
+        rng.uniform(-140, 140, n_rows),
     )
+    lat = np.clip(lat, -90, 90).round(6)
+    lon = np.clip(lon, -180, 180).round(6)
+
+    # IP: у части фродеров — VPN-пулы анонимайзеров
+    vpn_pool = ["185.220.101.4", "104.218.123.9", "45.61.33.2", "5.188.206.31"]
+    vpn_for_fraud = rng.random(n_rows) < 0.35
+    ip = np.where(
+        (is_fraud == 1) & vpn_for_fraud,
+        rng.choice(vpn_pool, size=n_rows),
+        np.array([f"192.168.{rng.integers(0, 255)}.{rng.integers(1, 255)}" for _ in range(n_rows)]),
+    )
+
+    # Временные метки: у каждого пользователя свой распорядок дня;
+    # у фродеров — burst-паттерн (5–8 операций в узком окне → высокий Velocity)
+    user_daily_start = rng.integers(6, 22, size=n_users)          # час начала активности
+    user_active_days = rng.integers(1, 30, size=n_users)          # сколько дней пользователь активен
+
+    # Базовый день для легитимных
+    day_offset = rng.uniform(0, user_active_days[user_row], size=n_rows)
+
+    # Burst-центры для фрод-пользователей (в те же активные дни)
+    burst_hour = (user_daily_start[user_row] + rng.uniform(0, 8, size=n_rows)) % 24
+
+    hour_of_day = np.where(
+        is_fraud == 1,
+        burst_hour,
+        (user_daily_start[user_row] + np.clip(rng.normal(4, 2.5, size=n_rows), -2, 8)) % 24,
+    )
+
+    minutes = np.where(
+        is_fraud == 1,
+        rng.exponential(5.5, size=n_rows),      # плотная пачка ≈ 10+ операций/час
+        rng.uniform(0, 59, size=n_rows),
+    )
+
+    seconds_total = (day_offset * 86400 + hour_of_day * 3600 + minutes * 60).astype(np.int64)
+    timestamps = base_ts + pd.to_timedelta(seconds_total, unit="s")
 
     return pd.DataFrame(
         {
-            "user_id":        rng.choice(user_ids, n_rows),
+            "user_id":        user_ids[user_row],
             "transaction_id": [f"TXN-{i:08d}" for i in range(n_rows)],
             "timestamp":      timestamps,
-            "amount":         amounts.round(2),
-            "lat":            lat.round(6),
-            "lon":            lon.round(6),
-            "ip":             [f"192.168.{rng.integers(0,255)}.{rng.integers(1,255)}" for _ in range(n_rows)],
+            "amount":         amounts,
+            "lat":            lat,
+            "lon":            lon,
+            "ip":             ip,
             "is_fraud":       is_fraud,
         }
     )
