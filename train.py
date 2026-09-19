@@ -10,7 +10,7 @@ import joblib
 
 smote = SMOTE(random_state=42)
 np.random.seed(42)
-n_samples = 10000
+n_samples = 100000
 df = pd.DataFrame({
     'amount': np.random.exponential(scale=15000, size=n_samples),
     'country_code': np.random.randint(1, 10, size=n_samples),

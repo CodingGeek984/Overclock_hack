@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 import models, schemas
+import services
+
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate, is_fraud: bool):
     db_item = models.TransactionItem(
@@ -17,6 +19,7 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate, is_f
 
 
 def get_fraud_stats(db: Session):
+    metrics = services.calculate_metrics()
     total_count = db.query(models.TransactionItem).count()
     fraud_records = db.query(models.TransactionItem).filter(models.TransactionItem.is_fraud == True).all()
 
@@ -31,7 +34,10 @@ def get_fraud_stats(db: Session):
         "blocked_frauds": fraud_count,
         "safe_transactions": safe_count,
         "fraud_loss_saved_tg": round(saved_budget, 2),
-        "false_positive_rate_pct": false_positive_rate
+        "false_positive_rate_pct": false_positive_rate,
+        "precision": metrics.get("precision"),
+        "recall": metrics.get("recall"),
+        "optimal_threshold": metrics.get("optimal_threshold")
     }
 
 def get_transactions(db: Session, skip: int = 0, limit: int = 20):
